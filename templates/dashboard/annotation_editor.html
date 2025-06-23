@@ -1,0 +1,414 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Éditeur d'annotations{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sentence-container {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .sentence-text {
+        font-size: 1.1em;
+        line-height: 1.6;
+        margin-bottom: 15px;
+        padding: 15px;
+        background: white;
+        border-radius: 5px;
+        border-left: 4px solid #007bff;
+    }
+    
+    .annotation-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        background: white;
+        transition: all 0.3s ease;
+    }
+    
+    .annotation-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .annotation-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 12px 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .annotation-content {
+        padding: 15px;
+    }
+    
+    .entity-text {
+        background: #e3f2fd;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+        color: #1976d2;
+    }
+    
+    .entity-type {
+        background: #f3e5f5;
+        color: #7b1fa2;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+    
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+    }
+    
+    .status-pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-validated {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-rejected {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .btn-validate {
+        background: #28a745;
+        border-color: #28a745;
+        color: white;
+    }
+    
+    .btn-reject {
+        background: #dc3545;
+        border-color: #dc3545;
+        color: white;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-validate:hover {
+        background: #218838;
+    }
+    
+    .btn-reject:hover {
+        background: #c82333;
+    }
+    
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .annotation-meta {
+        font-size: 0.85em;
+        color: #6c757d;
+        margin-top: 10px;
+    }
+    
+    .loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+    
+    .alert {
+        padding: 12px 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+    }
+    
+    .alert-success {
+        color: #155724;
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+    }
+    
+    .alert-danger {
+        color: #721c24;
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+    }
+    
+    .no-annotations {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 2px dashed #dee2e6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Éditeur d'annotations</h2>
+                <a href="{% url 'dashboard:document_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour aux documents
+                </a>
+            </div>
+            
+            <!-- Message d'alerte -->
+            <div id="alert-container"></div>
+            
+            <!-- Phrase à annoter -->
+            <div class="sentence-container">
+                <h4>Phrase à annoter</h4>
+                <div class="sentence-text">
+                    {{ sentence.text }}
+                </div>
+                <div class="text-muted">
+                    <small>
+                        Document: {{ sentence.document.title }} | 
+                        Position: {{ sentence.position }} | 
+                        ID: {{ sentence.id }}
+                    </small>
+                </div>
+            </div>
+            
+            <!-- Liste des annotations -->
+            <div class="annotations-section">
+                <h4>Annotations ({{ annotations.count }})</h4>
+                
+                {% if annotations %}
+                    <div id="annotations-list">
+                        {% for annotation in annotations %}
+                        <div class="annotation-card" data-annotation-id="{{ annotation.id }}">
+                            <div class="annotation-header">
+                                <div>
+                                    <span class="entity-text">{{ annotation.text }}</span>
+                                    <span class="entity-type">{{ annotation.entity_type.name }}</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="status-badge status-{{ annotation.validation_status }}">
+                                        {% if annotation.validation_status == 'pending' %}
+                                            En attente
+                                        {% elif annotation.validation_status == 'validated' %}
+                                            Validée
+                                        {% elif annotation.validation_status == 'rejected' %}
+                                            Rejetée
+                                        {% endif %}
+                                    </span>
+                                    
+                                    {% if annotation.validation_status == 'pending' %}
+                                    <div class="action-buttons">
+                                        <button class="btn btn-sm btn-validate" 
+                                                onclick="updateAnnotation({{ annotation.id }}, 'validate')">
+                                            <i class="fas fa-check"></i> Valider
+                                        </button>
+                                        <button class="btn btn-sm btn-reject" 
+                                                onclick="updateAnnotation({{ annotation.id }}, 'reject')">
+                                            <i class="fas fa-times"></i> Rejeter
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="annotation-content">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>Position:</strong> {{ annotation.start_pos }} - {{ annotation.end_pos }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Confiance:</strong> {{ annotation.confidence|floatformat:2 }}
+                                    </div>
+                                </div>
+                                
+                                {% if annotation.attributes %}
+                                <div class="mt-2">
+                                    <strong>Attributs:</strong>
+                                    <pre class="bg-light p-2 mt-1">{{ annotation.attributes|pprint }}</pre>
+                                </div>
+                                {% endif %}
+                                
+                                <div class="annotation-meta">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            Créée par: {{ annotation.created_by.username|default:"Système" }} 
+                                            le {{ annotation.created_at|date:"d/m/Y à H:i" }}
+                                        </div>
+                                        <div class="col-md-6">
+                                            {% if annotation.validated_by %}
+                                                {% if annotation.validation_status == 'validated' %}
+                                                    Validée par: {{ annotation.validated_by.username }} 
+                                                    le {{ annotation.validated_at|date:"d/m/Y à H:i" }}
+                                                {% elif annotation.validation_status == 'rejected' %}
+                                                    Rejetée par: {{ annotation.validated_by.username }} 
+                                                    le {{ annotation.validated_at|date:"d/m/Y à H:i" }}
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="no-annotations">
+                        <i class="fas fa-tags fa-3x mb-3"></i>
+                        <h5>Aucune annotation trouvée</h5>
+                        <p>Cette phrase n'a pas encore d'annotations.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Configuration CSRF pour Django
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+const csrftoken = getCookie('csrftoken');
+
+// Fonction pour afficher les alertes
+function showAlert(message, type = 'success') {
+    const alertContainer = document.getElementById('alert-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close float-end" onclick="this.parentElement.remove()">×</button>
+    `;
+    alertContainer.appendChild(alertDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentElement) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Fonction pour mettre à jour une annotation
+function updateAnnotation(annotationId, action) {
+    const annotationCard = document.querySelector(`[data-annotation-id="${annotationId}"]`);
+    const buttons = annotationCard.querySelectorAll('.btn');
+    
+    // Désactiver les boutons pendant la requête
+    buttons.forEach(btn => {
+        btn.disabled = true;
+    });
+    annotationCard.classList.add('loading');
+    
+    // Préparer les données
+    const formData = new FormData();
+    formData.append('annotation_id', annotationId);
+    formData.append('action', action);
+    formData.append('csrfmiddlewaretoken', csrftoken);
+    
+    // Envoyer la requête AJAX
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': csrftoken,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Mettre à jour l'interface
+            updateAnnotationUI(annotationCard, action);
+            
+            const actionText = action === 'validate' ? 'validée' : 'rejetée';
+            showAlert(`Annotation ${actionText} avec succès!`, 'success');
+        } else {
+            throw new Error('Erreur lors de la mise à jour');
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showAlert('Erreur lors de la mise à jour de l\'annotation', 'danger');
+        
+        // Réactiver les boutons en cas d'erreur
+        buttons.forEach(btn => {
+            btn.disabled = false;
+        });
+        annotationCard.classList.remove('loading');
+    });
+}
+
+// Fonction pour mettre à jour l'interface après validation/rejet
+function updateAnnotationUI(annotationCard, action) {
+    const statusBadge = annotationCard.querySelector('.status-badge');
+    const actionButtons = annotationCard.querySelector('.action-buttons');
+    
+    // Mettre à jour le badge de statut
+    statusBadge.className = `status-badge status-${action === 'validate' ? 'validated' : 'rejected'}`;
+    statusBadge.textContent = action === 'validate' ? 'Validée' : 'Rejetée';
+    
+    // Supprimer les boutons d'action
+    if (actionButtons) {
+        actionButtons.remove();
+    }
+    
+    // Mettre à jour les métadonnées (optionnel - nécessiterait une requête supplémentaire pour obtenir les détails)
+    const metaDiv = annotationCard.querySelector('.annotation-meta .col-md-6:last-child');
+    if (metaDiv) {
+        const actionText = action === 'validate' ? 'Validée' : 'Rejetée';
+        const now = new Date().toLocaleDateString('fr-FR') + ' à ' + new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+        metaDiv.innerHTML = `${actionText} par: {{ user.username }} le ${now}`;
+    }
+    
+    // Supprimer l'état de chargement
+    annotationCard.classList.remove('loading');
+}
+
+// Ajouter des raccourcis clavier
+document.addEventListener('keydown', function(e) {
+    // Échap pour fermer les alertes
+    if (e.key === 'Escape') {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => alert.remove());
+    }
+});
+</script>
+{% endblock %}

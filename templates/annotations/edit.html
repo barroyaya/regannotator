@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+
+{% block title %}Éditer Annotation - RegAnnotator{% endblock %}
+{% block page_title %}Éditer une Annotation{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <!-- Informations contextuelles -->
+        <div class="stat-card mb-4">
+            <h6 class="mb-3">Contexte de l'Annotation</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Document :</strong><br>
+                    <small class="text-muted">{{ annotation.sentence.document.title|truncatechars:50 }}</small>
+                </div>
+                <div class="col-md-6">
+                    <strong>Phrase {{ annotation.sentence.sentence_number }} :</strong><br>
+                    <small class="text-muted">{{ annotation.sentence.text|truncatechars:60 }}</small>
+                </div>
+            </div>
+            <hr>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Attention :</strong> Toute modification sera tracée et créera un feedback expert.
+            </div>
+        </div>
+        
+        <!-- Formulaire d'édition -->
+        <div class="stat-card">
+            <h5 class="mb-4">Modifier l'Annotation</h5>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Valeur actuelle</label>
+                            <div class="form-control bg-light">
+                                <span class="badge" style="background-color: {{ annotation.entity_type.color }};">
+                                    {{ annotation.entity_type.name }}
+                                </span>
+                                "{{ annotation.text_value }}"
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nouvelle valeur <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="text_value" 
+                                   value="{{ annotation.text_value }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nouveau type d'entité</label>
+                            <select class="form-select" name="entity_type_id">
+                                {% for entity in entity_types %}
+                                    <option value="{{ entity.id }}" 
+                                            {% if entity.id == annotation.entity_type.id %}selected{% endif %}
+                                            style="color: {{ entity.color }};">
+                                        {{ entity.name }} - {{ entity.description }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Phrase complète</label>
+                            <div class="form-control" style="height: 120px; overflow-y: auto; background-color: #f8f9fa;">
+                                {{ annotation.sentence.text }}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Commentaire de modification</label>
+                            <textarea class="form-control" name="comment" rows="3" 
+                                      placeholder="Expliquez pourquoi vous modifiez cette annotation..."></textarea>
+                            <div class="form-text">Ce commentaire sera ajouté au feedback expert</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Informations sur l'annotation -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <h6>Informations Actuelles</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Source :</strong></td>
+                                    <td>{{ annotation.get_source_display }}</td>
+                                    <td><strong>Confiance :</strong></td>
+                                    <td>{{ annotation.confidence_score|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Statut :</strong></td>
+                                    <td>{{ annotation.get_validation_status_display }}</td>
+                                    <td><strong>Position :</strong></td>
+                                    <td>{{ annotation.start_position }}-{{ annotation.end_position }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Créée le :</strong></td>
+                                    <td>{{ annotation.created_at|date:"d/m/Y H:i" }}</td>
+                                    <td><strong>Par :</strong></td>
+                                    <td>{{ annotation.created_by|default:"Système" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'annotations:annotation_editor' annotation.sentence.id %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save"></i> Modifier l'Annotation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Historique des modifications -->
+{% if annotation.feedbacks.exists %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h6 class="mb-3">Historique des Modifications</h6>
+            <div class="timeline">
+                {% for feedback in annotation.feedbacks.all %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker">
+                            <i class="fas fa-comment text-info"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <div class="d-flex justify-content-between">
+                                <strong>{{ feedback.expert.username }}</strong>
+                                <small class="text-muted">{{ feedback.created_at|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <small class="text-muted">{{ feedback.get_feedback_type_display }}</small>
+                            <p class="mb-1">{{ feedback.comment }}</p>
+                            {% if feedback.suggested_value %}
+                                <div class="badge bg-light text-dark">Suggestion: "{{ feedback.suggested_value }}"</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border-left: 3px solid #007bff;
+}
+</style>
+{% endblock %}

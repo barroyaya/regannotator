@@ -1,0 +1,409 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload en Lot - RegAnnotator{% endblock %}
+{% block page_title %}Upload en Lot de Documents{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0">📁 Upload en Lot de Documents</h5>
+                <a href="{% url 'documents:upload' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-file"></i> Upload simple
+                </a>
+            </div>
+
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Upload en lot:</strong> Téléchargez plusieurs documents simultanément. 
+                Chaque document sera traité automatiquement avec extraction des métadonnées.
+            </div>
+
+            <form method="post" enctype="multipart/form-data" id="bulkUploadForm">
+                {% csrf_token %}
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="fas fa-files"></i> Sélection des Fichiers</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="{{ form.files.id_for_label }}" class="form-label">
+                                        Fichiers à télécharger
+                                    </label>
+                                    {{ form.files }}
+                                    {% if form.files.errors %}
+                                        <div class="text-danger small">{{ form.files.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        {{ form.files.help_text }}<br>
+                                        <strong>Formats supportés:</strong> PDF, DOC, DOCX, TXT, HTML, RTF, ODT, ZIP<br>
+                                        <strong>Limites:</strong> Maximum 20 fichiers, 500MB au total
+                                    </div>
+                                </div>
+
+                                <!-- Zone de drag & drop -->
+                                <div class="drop-zone border-dashed border-2 border-primary p-4 text-center" id="dropZone">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                    <p class="mb-2"><strong>Glissez-déposez vos fichiers ici</strong></p>
+                                    <p class="text-muted small">ou utilisez le bouton ci-dessus</p>
+                                </div>
+
+                                <!-- Liste des fichiers sélectionnés -->
+                                <div id="fileList" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-cogs"></i> Options</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="{{ form.default_context.id_for_label }}" class="form-label">
+                                        Contexte par défaut
+                                    </label>
+                                    {{ form.default_context }}
+                                    <div class="form-text">{{ form.default_context.help_text }}</div>
+                                </div>
+
+                                <div class="form-check">
+                                    {{ form.auto_process }}
+                                    <label class="form-check-label" for="{{ form.auto_process.id_for_label }}">
+                                        {{ form.auto_process.label }}
+                                    </label>
+                                    <div class="form-text">{{ form.auto_process.help_text }}</div>
+                                </div>
+
+                                <hr>
+
+                                <div class="mb-3">
+                                    <h6 class="mb-2">🤖 Traitement Automatique</h6>
+                                    <ul class="list-unstyled small">
+                                        <li><i class="fas fa-check text-success"></i> Extraction du texte</li>
+                                        <li><i class="fas fa-check text-success"></i> Détection des métadonnées</li>
+                                        <li><i class="fas fa-check text-success"></i> Segmentation en phrases</li>
+                                        <li><i class="fas fa-check text-success"></i> Logs d'extraction</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-4">
+                    <a href="{% url 'dashboard:document_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour à la liste
+                    </a>
+                    
+                    <div class="d-flex align-items-center">
+                        <div id="uploadProgress" class="me-3" style="display: none;">
+                            <div class="progress" style="width: 200px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted">Traitement en cours...</small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                            <i class="fas fa-upload"></i> Télécharger les Documents
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Aide et statistiques -->
+<div class="row justify-content-center mt-4">
+    <div class="col-md-10">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stat-card text-center">
+                    <i class="fas fa-lightning fa-2x text-warning mb-2"></i>
+                    <h6>Traitement Rapide</h6>
+                    <p class="small text-muted">Traitement parallèle de tous les documents</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="stat-card text-center">
+                    <i class="fas fa-brain fa-2x text-info mb-2"></i>
+                    <h6>IA Intégrée</h6>
+                    <p class="small text-muted">Extraction automatique des métadonnées</p>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="stat-card text-center">
+                    <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
+                    <h6>Suivi Complet</h6>
+                    <p class="small text-muted">Logs détaillés de chaque extraction</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.drop-zone {
+    border-style: dashed !important;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.drop-zone:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.drop-zone.dragover {
+    background-color: rgba(13, 110, 253, 0.2);
+    border-color: #0d6efd !important;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    margin: 5px 0;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #0d6efd;
+}
+
+.file-item .file-info {
+    flex-grow: 1;
+}
+
+.file-item .file-size {
+    color: #6c757d;
+    font-size: 0.9em;
+}
+
+.file-item .file-remove {
+    color: #dc3545;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.file-item .file-remove:hover {
+    color: #a71e2a;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('bulkUploadForm');
+    const fileInput = document.getElementById('{{ form.files.id_for_label }}');
+    const dropZone = document.getElementById('dropZone');
+    const fileList = document.getElementById('fileList');
+    const submitBtn = document.getElementById('submitBtn');
+    const progressDiv = document.getElementById('uploadProgress');
+    
+    let selectedFiles = [];
+
+    // Configuration du drag & drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    dropZone.addEventListener('drop', handleDrop, false);
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function highlight(e) {
+        dropZone.classList.add('dragover');
+    }
+
+    function unhighlight(e) {
+        dropZone.classList.remove('dragover');
+    }
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        handleFiles(files);
+    }
+
+    // Gestion des fichiers sélectionnés via input
+    fileInput.addEventListener('change', function(e) {
+        handleFiles(e.target.files);
+    });
+
+    function handleFiles(files) {
+        selectedFiles = Array.from(files);
+        updateFileList();
+        updateSubmitButton();
+    }
+
+    function updateFileList() {
+        fileList.innerHTML = '';
+        
+        if (selectedFiles.length === 0) {
+            fileList.innerHTML = '<p class="text-muted text-center">Aucun fichier sélectionné</p>';
+            return;
+        }
+
+        const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+        const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+
+        // Header avec statistiques
+        const header = document.createElement('div');
+        header.className = 'alert alert-light';
+        header.innerHTML = `
+            <div class="d-flex justify-content-between">
+                <span><strong>${selectedFiles.length}</strong> fichier(s) sélectionné(s)</span>
+                <span><strong>${totalSizeMB} MB</strong> au total</span>
+            </div>
+        `;
+        fileList.appendChild(header);
+
+        // Liste des fichiers
+        selectedFiles.forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            
+            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            const fileIcon = getFileIcon(file.name);
+            
+            fileItem.innerHTML = `
+                <div class="file-info">
+                    <div class="d-flex align-items-center">
+                        <i class="${fileIcon} me-2"></i>
+                        <strong>${file.name}</strong>
+                    </div>
+                    <div class="file-size">${fileSizeMB} MB</div>
+                </div>
+                <div class="file-remove" onclick="removeFile(${index})">
+                    <i class="fas fa-times"></i>
+                </div>
+            `;
+            
+            fileList.appendChild(fileItem);
+        });
+
+        // Validation
+        const warnings = [];
+        if (selectedFiles.length > 20) {
+            warnings.push('Maximum 20 fichiers autorisés');
+        }
+        if (totalSize > 500 * 1024 * 1024) {
+            warnings.push('Taille totale supérieure à 500 MB');
+        }
+
+        if (warnings.length > 0) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'alert alert-warning';
+            warningDiv.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Attention:</strong>
+                <ul class="mb-0 mt-1">
+                    ${warnings.map(w => `<li>${w}</li>`).join('')}
+                </ul>
+            `;
+            fileList.appendChild(warningDiv);
+        }
+    }
+
+    function getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const icons = {
+            'pdf': 'fas fa-file-pdf text-danger',
+            'doc': 'fas fa-file-word text-primary',
+            'docx': 'fas fa-file-word text-primary',
+            'txt': 'fas fa-file-alt text-secondary',
+            'html': 'fas fa-file-code text-warning',
+            'htm': 'fas fa-file-code text-warning',
+            'rtf': 'fas fa-file-alt text-info',
+            'odt': 'fas fa-file-alt text-success',
+            'zip': 'fas fa-file-archive text-dark',
+            'rar': 'fas fa-file-archive text-dark'
+        };
+        return icons[ext] || 'fas fa-file text-muted';
+    }
+
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        updateFileList();
+        updateSubmitButton();
+        
+        // Mettre à jour l'input file
+        const dt = new DataTransfer();
+        selectedFiles.forEach(file => dt.items.add(file));
+        fileInput.files = dt.files;
+    }
+
+    function updateSubmitButton() {
+        const isValid = selectedFiles.length > 0 && 
+                       selectedFiles.length <= 20 && 
+                       selectedFiles.reduce((sum, file) => sum + file.size, 0) <= 500 * 1024 * 1024;
+        
+        submitBtn.disabled = !isValid;
+    }
+
+    // Gestion de la soumission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (selectedFiles.length === 0) {
+            alert('Veuillez sélectionner au moins un fichier.');
+            return;
+        }
+
+        // Mettre à jour l'input file avec les fichiers sélectionnés
+        const dt = new DataTransfer();
+        selectedFiles.forEach(file => dt.items.add(file));
+        fileInput.files = dt.files;
+
+        // Afficher la progress bar
+        submitBtn.style.display = 'none';
+        progressDiv.style.display = 'block';
+        
+        // Simuler le progrès (en réalité, Django gérera l'upload)
+        let progress = 0;
+        const progressBar = progressDiv.querySelector('.progress-bar');
+        
+        const interval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            
+            progressBar.style.width = progress + '%';
+        }, 500);
+
+        // Soumettre le formulaire
+        setTimeout(() => {
+            clearInterval(interval);
+            form.submit();
+        }, 1000);
+    });
+
+    // Fonction globale pour supprimer un fichier
+    window.removeFile = removeFile;
+});
+</script>
+{% endblock %}

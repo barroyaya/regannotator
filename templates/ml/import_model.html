@@ -1,0 +1,779 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Importer un modèle{% endblock %}
+
+{% block extra_css %}
+<style>
+    .import-header {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    .import-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.9;
+    }
+    .upload-zone {
+        border: 3px dashed #17a2b8;
+        border-radius: 8px;
+        padding: 3rem 2rem;
+        text-align: center;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        margin-bottom: 2rem;
+    }
+    .upload-zone:hover {
+        border-color: #138496;
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        transform: translateY(-2px);
+    }
+    .upload-zone.dragover {
+        border-color: #28a745;
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    }
+    .upload-icon {
+        font-size: 4rem;
+        color: #17a2b8;
+        margin-bottom: 1rem;
+    }
+    .file-input {
+        display: none;
+    }
+    .file-info {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border-left: 4px solid #28a745;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        display: none;
+    }
+    .import-options {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #ffc107;
+    }
+    .progress-container {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-top: 2rem;
+        display: none;
+    }
+    .import-step {
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        border-left: 4px solid #dee2e6;
+        background: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+    .import-step.active {
+        border-left-color: #17a2b8;
+        background: #d1ecf1;
+    }
+    .import-step.completed {
+        border-left-color: #28a745;
+        background: #d4edda;
+    }
+    .import-step.error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+    }
+    .supported-formats {
+        background: #e7f3ff;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+    }
+    .format-item {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .format-item:last-child {
+        border-bottom: none;
+    }
+    .format-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        font-weight: bold;
+        color: white;
+    }
+    .btn-import {
+        background: linear-gradient(45deg, #17a2b8, #138496);
+        border: none;
+        padding: 12px 30px;
+        font-weight: bold;
+        border-radius: 6px;
+        color: white;
+        transition: all 0.3s ease;
+    }
+    .btn-import:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3);
+        color: white;
+    }
+    .validation-results {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-top: 2rem;
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- En-tête -->
+            <div class="import-header text-center">
+                <i class="fas fa-cloud-upload-alt import-icon"></i>
+                <h1 class="h3 mb-2">Importer un modèle</h1>
+                <p class="mb-0 opacity-75">
+                    Importez un modèle pré-entraîné pour l'utiliser dans votre système de détection d'entités
+                </p>
+            </div>
+
+            <!-- Formats supportés -->
+            <div class="supported-formats">
+                <h6 class="mb-3">
+                    <i class="fas fa-file-alt text-info"></i>
+                    Formats supportés
+                </h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="format-item">
+                            <div class="format-icon" style="background: #007bff;">
+                                JSON
+                            </div>
+                            <div>
+                                <strong>Modèle JSON</strong><br>
+                                <small class="text-muted">Export standard (.json)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="format-item">
+                            <div class="format-icon" style="background: #28a745;">
+                                PKL
+                            </div>
+                            <div>
+                                <strong>Pickle</strong><br>
+                                <small class="text-muted">Modèle sérialisé (.pkl)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="format-item">
+                            <div class="format-icon" style="background: #ffc107;">
+                                H5
+                            </div>
+                            <div>
+                                <strong>TensorFlow/Keras</strong><br>
+                                <small class="text-muted">Modèle Keras (.h5)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-4">
+                        <div class="format-item">
+                            <div class="format-icon" style="background: #dc3545;">
+                                PTH
+                            </div>
+                            <div>
+                                <strong>PyTorch</strong><br>
+                                <small class="text-muted">Modèle PyTorch (.pth)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="format-item">
+                            <div class="format-icon" style="background: #6f42c1;">
+                                ZIP
+                            </div>
+                            <div>
+                                <strong>Archive complète</strong><br>
+                                <small class="text-muted">Modèle + métadonnées (.zip)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="format-item">
+                            <div class="format-icon" style="background: #fd7e14;">
+                                BIN
+                            </div>
+                            <div>
+                                <strong>Binaire</strong><br>
+                                <small class="text-muted">Modèle binaire (.bin)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Zone de téléchargement -->
+                <div class="col-lg-8">
+                    <form method="post" enctype="multipart/form-data" id="importForm">
+                        {% csrf_token %}
+                        
+                        <!-- Zone de drag & drop -->
+                        <div class="upload-zone" id="uploadZone">
+                            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                            <h5 class="mb-3">Glissez-déposez votre fichier ici</h5>
+                            <p class="text-muted mb-3">ou</p>
+                            <button type="button" class="btn btn-outline-info" onclick="document.getElementById('fileInput').click()">
+                                <i class="fas fa-folder-open mr-2"></i>
+                                Parcourir les fichiers
+                            </button>
+                            <input type="file" id="fileInput" name="model_file" class="file-input" 
+                                   accept=".json,.pkl,.h5,.pth,.zip,.bin">
+                            <p class="text-muted mt-3 mb-0">
+                                <small>Taille maximum: 500 MB</small>
+                            </p>
+                        </div>
+
+                        <!-- Informations du fichier -->
+                        <div class="file-info" id="fileInfo">
+                            <h6>
+                                <i class="fas fa-file-check text-success"></i>
+                                Fichier sélectionné
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <dl class="row">
+                                        <dt class="col-sm-4">Nom:</dt>
+                                        <dd class="col-sm-8" id="fileName">-</dd>
+                                        
+                                        <dt class="col-sm-4">Taille:</dt>
+                                        <dd class="col-sm-8" id="fileSize">-</dd>
+                                        
+                                        <dt class="col-sm-4">Type:</dt>
+                                        <dd class="col-sm-8" id="fileType">-</dd>
+                                    </dl>
+                                </div>
+                                <div class="col-md-6">
+                                    <dl class="row">
+                                        <dt class="col-sm-6">Dernière modification:</dt>
+                                        <dd class="col-sm-6" id="fileModified">-</dd>
+                                        
+                                        <dt class="col-sm-6">Statut:</dt>
+                                        <dd class="col-sm-6">
+                                            <span class="badge badge-success">Prêt à importer</span>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Options d'import -->
+                        <div class="card import-options">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-cogs"></i>
+                                    Options d'importation
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="modelName">Nom du modèle *</label>
+                                            <input type="text" class="form-control" id="modelName" name="model_name" 
+                                                   placeholder="Ex: Modèle BERT importé" required>
+                                            <small class="form-text text-muted">
+                                                Nom d'affichage pour ce modèle dans le système
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="modelVersion">Version</label>
+                                            <input type="text" class="form-control" id="modelVersion" name="version" 
+                                                   placeholder="Ex: 1.0.0">
+                                            <small class="form-text text-muted">
+                                                Version du modèle (générée automatiquement si vide)
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="description">Description</label>
+                                    <textarea class="form-control" id="description" name="description" rows="3" 
+                                              placeholder="Description du modèle, de sa provenance et de ses spécificités..."></textarea>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="algorithm">Algorithme</label>
+                                            <select class="form-control" id="algorithm" name="algorithm">
+                                                <option value="">Détection automatique</option>
+                                                <option value="bert">BERT</option>
+                                                <option value="lstm">LSTM</option>
+                                                <option value="svm">SVM</option>
+                                                <option value="random-forest">Random Forest</option>
+                                                <option value="naive-bayes">Naive Bayes</option>
+                                                <option value="other">Autre</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <div class="form-check mt-4">
+                                                <input class="form-check-input" type="checkbox" id="activateModel" name="activate_model">
+                                                <label class="form-check-label" for="activateModel">
+                                                    <strong>Activer immédiatement</strong>
+                                                </label>
+                                                <small class="form-text text-muted">
+                                                    Le modèle sera déployé automatiquement après l'import
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="validateModel" name="validate_model" checked>
+                                        <label class="form-check-label" for="validateModel">
+                                            Valider la compatibilité du modèle
+                                        </label>
+                                        <small class="form-text text-muted">
+                                            Vérifier que le modèle est compatible avec le système actuel
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="backupExisting" name="backup_existing" checked>
+                                        <label class="form-check-label" for="backupExisting">
+                                            Sauvegarder les modèles existants
+                                        </label>
+                                        <small class="form-text text-muted">
+                                            Créer une sauvegarde avant d'importer le nouveau modèle
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Boutons d'action -->
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-import" id="importButton" disabled>
+                                <i class="fas fa-upload mr-2"></i>
+                                Commencer l'importation
+                            </button>
+                            <a href="{% url 'ml:model_list' %}" class="btn btn-outline-secondary ml-3">
+                                <i class="fas fa-times mr-2"></i>
+                                Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Panneau latéral -->
+                <div class="col-lg-4">
+                    <!-- Aide -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-question-circle text-info"></i>
+                                Guide d'importation
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="small">
+                                <h6>Étapes d'importation :</h6>
+                                <ol>
+                                    <li>Sélectionnez le fichier du modèle</li>
+                                    <li>Configurez les options d'import</li>
+                                    <li>Lancez l'importation</li>
+                                    <li>Attendez la validation</li>
+                                    <li>Vérifiez les résultats</li>
+                                </ol>
+                                
+                                <h6 class="mt-3">Conseils :</h6>
+                                <ul>
+                                    <li>Vérifiez la compatibilité du format</li>
+                                    <li>Assurez-vous que le modèle est complet</li>
+                                    <li>Testez sur un petit échantillon d'abord</li>
+                                    <li>Sauvegardez vos modèles actuels</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-chart-bar text-success"></i>
+                                Statistiques système
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center">
+                                <div class="mb-3">
+                                    <h4 class="text-primary mb-0">15</h4>
+                                    <small class="text-muted">Modèles actifs</small>
+                                </div>
+                                <div class="mb-3">
+                                    <h4 class="text-success mb-0">2.3 GB</h4>
+                                    <small class="text-muted">Espace utilisé</small>
+                                </div>
+                                <div class="mb-3">
+                                    <h4 class="text-info mb-0">7.2 GB</h4>
+                                    <small class="text-muted">Espace disponible</small>
+                                </div>
+                                <div class="progress mt-3" style="height: 8px;">
+                                    <div class="progress-bar" style="width: 24%" role="progressbar"></div>
+                                </div>
+                                <small class="text-muted">Utilisation du stockage</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progression de l'import -->
+            <div class="progress-container" id="progressContainer">
+                <h5 class="mb-3">
+                    <i class="fas fa-cogs text-primary"></i>
+                    Progression de l'importation
+                </h5>
+                
+                <div class="import-step" id="step1">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-upload mr-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>Téléchargement du fichier</strong>
+                            <div class="text-muted">Envoi du fichier vers le serveur...</div>
+                        </div>
+                        <div class="ml-auto">
+                            <span class="badge badge-secondary">En attente</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="import-step" id="step2">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-check-circle mr-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>Validation du format</strong>
+                            <div class="text-muted">Vérification de la compatibilité...</div>
+                        </div>
+                        <div class="ml-auto">
+                            <span class="badge badge-secondary">En attente</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="import-step" id="step3">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-brain mr-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>Chargement du modèle</strong>
+                            <div class="text-muted">Initialisation et test du modèle...</div>
+                        </div>
+                        <div class="ml-auto">
+                            <span class="badge badge-secondary">En attente</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="import-step" id="step4">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-database mr-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>Sauvegarde en base</strong>
+                            <div class="text-muted">Enregistrement des métadonnées...</div>
+                        </div>
+                        <div class="ml-auto">
+                            <span class="badge badge-secondary">En attente</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="import-step" id="step5">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-rocket mr-3"></i>
+                        <div class="flex-grow-1">
+                            <strong>Déploiement</strong>
+                            <div class="text-muted">Activation du modèle (optionnel)...</div>
+                        </div>
+                        <div class="ml-auto">
+                            <span class="badge badge-secondary">En attente</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Résultats de validation -->
+            <div class="validation-results" id="validationResults">
+                <h5 class="mb-3">
+                    <i class="fas fa-clipboard-check text-success"></i>
+                    Résultats de la validation
+                </h5>
+                <div id="validationContent">
+                    <!-- Contenu dynamique -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Éléments du DOM
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const importButton = document.getElementById('importButton');
+const importForm = document.getElementById('importForm');
+const progressContainer = document.getElementById('progressContainer');
+
+// Gestion du drag & drop
+uploadZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+});
+
+uploadZone.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+});
+
+uploadZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        handleFileSelect(files[0]);
+    }
+});
+
+// Gestion de la sélection de fichier
+fileInput.addEventListener('change', function(e) {
+    if (e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+    }
+});
+
+// Traitement du fichier sélectionné
+function handleFileSelect(file) {
+    // Validation de la taille (500 MB max)
+    const maxSize = 500 * 1024 * 1024; // 500 MB
+    if (file.size > maxSize) {
+        alert('Le fichier est trop volumineux. Taille maximum autorisée : 500 MB');
+        return;
+    }
+    
+    // Validation du format
+    const allowedTypes = ['.json', '.pkl', '.h5', '.pth', '.zip', '.bin'];
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+    if (!allowedTypes.includes(fileExt)) {
+        alert('Format de fichier non supporté. Types autorisés : ' + allowedTypes.join(', '));
+        return;
+    }
+    
+    // Affichage des informations du fichier
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = formatFileSize(file.size);
+    document.getElementById('fileType').textContent = file.type || 'Non défini';
+    document.getElementById('fileModified').textContent = new Date(file.lastModified).toLocaleDateString();
+    
+    // Génération automatique du nom du modèle
+    const modelNameInput = document.getElementById('modelName');
+    if (!modelNameInput.value) {
+        const baseName = file.name.split('.').slice(0, -1).join('.');
+        modelNameInput.value = 'Modèle importé - ' + baseName;
+    }
+    
+    // Affichage de la zone d'informations et activation du bouton
+    fileInfo.style.display = 'block';
+    importButton.disabled = false;
+    
+    // Animation
+    fileInfo.style.opacity = '0';
+    fileInfo.style.transform = 'translateY(20px)';
+    setTimeout(() => {
+        fileInfo.style.transition = 'all 0.5s ease';
+        fileInfo.style.opacity = '1';
+        fileInfo.style.transform = 'translateY(0)';
+    }, 100);
+}
+
+// Formatage de la taille du fichier
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Gestion de l'envoi du formulaire
+importForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Validation finale
+    const modelName = document.getElementById('modelName').value.trim();
+    if (!modelName) {
+        alert('Veuillez saisir un nom pour le modèle.');
+        return;
+    }
+    
+    if (!fileInput.files.length) {
+        alert('Veuillez sélectionner un fichier à importer.');
+        return;
+    }
+    
+    // Confirmation
+    if (!confirm('Êtes-vous sûr de vouloir importer ce modèle ?')) {
+        return;
+    }
+    
+    // Lancement de l'importation
+    startImportProcess();
+});
+
+// Processus d'importation
+function startImportProcess() {
+    // Masquer le formulaire et afficher la progression
+    document.querySelector('.upload-zone').style.display = 'none';
+    document.querySelector('.import-options').style.display = 'none';
+    document.querySelector('.text-center').style.display = 'none';
+    progressContainer.style.display = 'block';
+    
+    // Simulation du processus d'importation
+    const steps = ['step1', 'step2', 'step3', 'step4', 'step5'];
+    let currentStep = 0;
+    
+    const interval = setInterval(() => {
+        if (currentStep < steps.length) {
+            updateStepStatus(steps[currentStep], 'active');
+            
+            setTimeout(() => {
+                updateStepStatus(steps[currentStep], 'completed');
+                currentStep++;
+                
+                if (currentStep >= steps.length) {
+                    clearInterval(interval);
+                    showImportComplete();
+                }
+            }, 2000);
+        }
+    }, 2500);
+}
+
+// Mise à jour du statut d'une étape
+function updateStepStatus(stepId, status) {
+    const step = document.getElementById(stepId);
+    const badge = step.querySelector('.badge');
+    
+    // Nettoyage des classes précédentes
+    step.classList.remove('active', 'completed', 'error');
+    
+    // Application du nouveau statut
+    step.classList.add(status);
+    
+    switch(status) {
+        case 'active':
+            badge.className = 'badge badge-primary';
+            badge.textContent = 'En cours...';
+            break;
+        case 'completed':
+            badge.className = 'badge badge-success';
+            badge.textContent = 'Terminé';
+            break;
+        case 'error':
+            badge.className = 'badge badge-danger';
+            badge.textContent = 'Erreur';
+            break;
+    }
+}
+
+// Affichage de l'importation terminée
+function showImportComplete() {
+    const validationResults = document.getElementById('validationResults');
+    const validationContent = document.getElementById('validationContent');
+    
+    validationContent.innerHTML = `
+        <div class="alert alert-success" role="alert">
+            <h6 class="alert-heading">
+                <i class="fas fa-check-circle"></i>
+                Importation réussie !
+            </h6>
+            <p>Le modèle a été importé avec succès et est maintenant disponible dans votre système.</p>
+            <hr>
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Modèle :</strong> ${document.getElementById('modelName').value}<br>
+                    <strong>Format :</strong> ${document.getElementById('fileName').textContent.split('.').pop().toUpperCase()}<br>
+                    <strong>Taille :</strong> ${document.getElementById('fileSize').textContent}
+                </div>
+                <div class="col-md-6">
+                    <strong>Statut :</strong> <span class="badge badge-success">Actif</span><br>
+                    <strong>ID :</strong> #${Math.floor(Math.random() * 10000)}<br>
+                    <strong>Version :</strong> ${document.getElementById('modelVersion').value || '1.0.0'}
+                </div>
+            </div>
+            <div class="mt-3">
+                <a href="{% url 'ml:model_list' %}" class="btn btn-success">
+                    <i class="fas fa-list"></i> Voir tous les modèles
+                </a>
+                <button type="button" class="btn btn-outline-success ml-2" onclick="location.reload()">
+                    <i class="fas fa-plus"></i> Importer un autre modèle
+                </button>
+            </div>
+        </div>
+    `;
+    
+    validationResults.style.display = 'block';
+    validationResults.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Validation en temps réel du nom du modèle
+document.getElementById('modelName').addEventListener('input', function() {
+    const value = this.value.trim();
+    importButton.disabled = !value || !fileInput.files.length;
+});
+
+// Animation d'entrée des éléments
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.card, .upload-zone, .supported-formats');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+});
+</script>
+{% endblock %}

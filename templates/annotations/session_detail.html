@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+
+{% block title %}Session {{ session.id }} - RegAnnotator{% endblock %}
+{% block page_title %}Détail de la Session d'Annotation{% endblock %}
+
+{% block content %}
+<!-- En-tête de la session -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h4>Session #{{ session.id }}</h4>
+                    <p class="text-muted mb-2">
+                        <i class="fas fa-file-pdf"></i> {{ session.document.title|truncatechars:60 }}
+                        <span class="mx-2">•</span>
+                        <i class="fas fa-building"></i> {{ session.document.source.acronym }}
+                        <span class="mx-2">•</span>
+                        <i class="fas fa-robot"></i> {{ session.llm_model }}
+                    </p>
+                    <div>
+                        <span class="badge bg-{% if session.status == 'running' %}warning{% elif session.status == 'completed' %}success{% else %}danger{% endif %} me-2">
+                            {{ session.get_status_display }}
+                        </span>
+                        {% if session.created_by %}
+                            <span class="badge bg-info">Par {{ session.created_by.username }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="text-end">
+                    {% if session.status == 'running' %}
+                        <button class="btn btn-warning me-2" onclick="pauseSession()">
+                            <i class="fas fa-pause"></i> Pause
+                        </button>
+                        <button class="btn btn-danger" onclick="stopSession()">
+                            <i class="fas fa-stop"></i> Arrêter
+                        </button>
+                    {% elif session.status == 'failed' %}
+                        <button class="btn btn-success me-2" onclick="retrySession()">
+                            <i class="fas fa-redo"></i> Relancer
+                        </button>
+                    {% endif %}
+                    <a href="{% url 'annotations:sessions' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Barre de progression -->
+            {% if total_sentences > 0 %}
+                {% widthratio processed_sentences total_sentences 100 as progress %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Progression du traitement</small>
+                        <small>{{ processed_sentences }}/{{ total_sentences }} phrases ({{ progress }}%)</small>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-{% if progress == 100 %}success{% elif progress > 50 %}info{% else %}warning{% endif %}" 
+                             style="width: {{ progress }}%" role="progressbar">
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h6 class="mb-3 text-center">Informations de Session</h6>
+            <div class="row text-center">
+                <div class="col-6">
+                    <div class="border-end">
+                        <h5 class="text-primary">{{ session.created_at|date:"d/m/Y" }}</h5>
+                        <small class="text-muted">Date Création</small>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <h5 class="text-success">{{ session.created_at|time:"H:i" }}</h5>
+                    <small class="text-muted">Heure Début</small>
+                </div>
+            </div>
+            {% if session.status == 'completed' %}
+                <hr>
+                <div class="text-center">
+                    <h6 class="text-info">
+                        {% with duration=session.updated_at|sub:session.created_at %}
+                            {% if duration.total_seconds < 60 %}
+                                {{ duration.total_seconds|floatformat:0 }} secondes
+                            {% elif duration.total_seconds < 3600 %}
+                                {{ duration.total_seconds|div:60|floatformat:0 }} minutes
+                            {% else %}
+                                {{ duration.total_seconds|div:3600|floatformat:1 }} heures
+                            {% endif %}
+                        {% endwith %}
+                    </h6>
+                    <small class="text-muted">Durée Totale</small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Métriques de la session -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-primary">{{ total_sentences }}</div>
+            <h6 class="text-muted">Phrases Total</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-success">{{ processed_sentences }}</div>
+            <h6 class="text-muted">Phrases Traitées</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-warning">{{ total_annotations }}</div>
+            <h6 class="text-muted">Annotations Créées</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-info">
+                {% if total_annotations > 0 and processed_sentences > 0 %}
+                    {{ total_annotations|div:processed_sentences|floatformat:1 }}
+                {% else %}
+                    0.0
+                {% endif %}
+            </div>
+            <h6 class="text-muted">Moy. par Phrase</h6>
+        </div>
+    </div>
+</div>
+
+<!-- Paramètres de la session -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h6 class="mb-3">Paramètres de Configuration</h6>
+            <table class="table table-sm">
+                <tr>
+                    <td><strong>Modèle IA :</strong></td>
+                    <td><span class="badge bg-info">{{ session.llm_model }}</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Document :</strong></td>
+                    <td>{{ session.document.title|truncatechars:40 }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Type Document :</strong></td>
+                    <td>{{ session.document.get_document_type_display }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Langue :</strong></td>
+                    <td>{{ session.document.get_language_display }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Taille Fichier :</strong></td>
+                    <td>{{ session.document.file_size_mb|default:"N/A" }} MB</td>
+                </tr>
+            </table>
+            
+            {% if session.parameters %}
+                <h6 class="mt-3 mb-2">Paramètres Avancés</h6>
+                <pre class="bg-light p-2 rounded small">{{ session.parameters|pprint }}</pre>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h6 class="mb-3">Performance de la Session</h6>
+            <div class="row">
+                <div class="col-6">
+                    <div class="text-center border-end">
+                        <h4 class="text-success">
+                            {% if total_sentences > 0 %}
+                                {{ processed_sentences|div:total_sentences|mul:100|floatformat:0 }}%
+                            {% else %}0%{% endif %}
+                        </h4>
+                        <small class="text-muted">Phrases Traitées</small>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="text-center">
+                        <h4 class="text-primary">
+                            {% if processed_sentences > 0 %}
+                                {{ total_annotations|div:processed_sentences|floatformat:1 }}
+                            {% else %}0.0{% endif %}
+                        </h4>
+                        <small class="text-muted">Annotations/Phrase</small>
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <!-- Estimation temps restant -->
+            {% if session.status == 'running' and processed_sentences > 0 %}
+                {% with remaining_sentences=total_sentences|sub:processed_sentences %}
+                {% with duration_so_far=session.updated_at|sub:session.created_at %}
+                    {% if duration_so_far.total_seconds > 0 %}
+                        {% with avg_time_per_sentence=duration_so_far.total_seconds|div:processed_sentences %}
+                        {% with estimated_remaining=remaining_sentences|mul:avg_time_per_sentence %}
+                            <div class="text-center">
+                                <h6 class="text-warning">
+                                    {% if estimated_remaining < 60 %}
+                                        ~{{ estimated_remaining|floatformat:0 }}s
+                                    {% elif estimated_remaining < 3600 %}
+                                        ~{{ estimated_remaining|div:60|floatformat:0 }}min
+                                    {% else %}
+                                        ~{{ estimated_remaining|div:3600|floatformat:1 }}h
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">Temps Estimé Restant</small>
+                            </div>
+                        {% endwith %}
+                        {% endwith %}
+                    {% endif %}
+                {% endwith %}
+                {% endwith %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Actions disponibles -->
+<div class="stat-card mb-4">
+    <h6 class="mb-3">Actions Disponibles</h6>
+    <div class="row">
+        <div class="col-md-3">
+            <div class="d-grid">
+                <a href="{% url 'dashboard:document_detail' session.document.id %}" class="btn btn-outline-primary">
+                    <i class="fas fa-file-pdf"></i> Voir le Document
+                </a>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-grid">
+                <a href="{% url 'documents:analytics' session.document.id %}" class="btn btn-outline-info">
+                    <i class="fas fa-chart-bar"></i> Analytics Document
+                </a>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-grid">
+                <button class="btn btn-outline-success" onclick="exportSessionResults()">
+                    <i class="fas fa-download"></i> Exporter Résultats
+                </button>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-grid">
+                <button class="btn btn-outline-warning" onclick="generateSessionReport()">
+                    <i class="fas fa-file-alt"></i> Rapport Session
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Log de session (si disponible) -->
+{% if session.status == 'failed' %}
+<div class="stat-card">
+    <h6 class="mb-3 text-danger">Détails de l'Erreur</h6>
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>La session a échoué.</strong> Vérifiez les logs ci-dessous ou contactez l'administrateur.
+    </div>
+    
+    <div class="bg-dark text-light p-3 rounded" style="font-family: monospace; font-size: 0.9rem;">
+        <div class="mb-2">
+            <strong>Dernières entrées du log :</strong>
+        </div>
+        <div id="session-logs">
+            <!-- Les logs seraient chargés via JavaScript depuis l'API -->
+            Session {{ session.id }} - {{ session.created_at|date:"Y-m-d H:i:s" }}<br>
+            Démarrage traitement document: {{ session.document.title }}<br>
+            Modèle: {{ session.llm_model }}<br>
+            {% if session.status == 'failed' %}
+            <span class="text-danger">ERREUR: Échec du traitement - Détails dans les logs système</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Actualisation automatique pour sessions en cours -->
+{% if session.status == 'running' %}
+<div class="alert alert-info">
+    <i class="fas fa-sync-alt fa-spin me-2"></i>
+    <strong>Session en cours d'exécution.</strong> Cette page se met à jour automatiquement toutes les 15 secondes.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Actualisation automatique pour sessions en cours
+{% if session.status == 'running' %}
+let refreshInterval = setInterval(() => {
+    location.reload();
+}, 15000); // Actualiser toutes les 15 secondes
+
+// Arrêter l'actualisation si la session n'est plus en cours
+window.addEventListener('beforeunload', () => {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+{% endif %}
+
+function pauseSession() {
+    if (confirm('Mettre en pause cette session ?')) {
+        fetch(`/api/sessions/{{ session.id }}/pause/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Erreur de communication: ' + error);
+        });
+    }
+}
+
+function stopSession() {
+    if (confirm('Arrêter définitivement cette session ? Cette action ne peut pas être annulée.')) {
+        fetch(`/api/sessions/{{ session.id }}/stop/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        });
+    }
+}
+
+function retrySession() {
+    if (confirm('Relancer cette session échouée ?')) {
+        fetch(`/api/sessions/{{ session.id }}/retry/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        });
+    }
+}
+
+function exportSessionResults() {
+    window.open(`/export/sessions/{{ session.id }}/results/?format=json`);
+}
+
+function generateSessionReport() {
+    window.open(`/export/sessions/{{ session.id }}/report/`);
+}
+
+// Charger les logs en temps réel pour les sessions en échec
+{% if session.status == 'failed' %}
+function loadSessionLogs() {
+    fetch(`/api/sessions/{{ session.id }}/logs/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.logs) {
+                document.getElementById('session-logs').innerHTML = data.logs.join('<br>');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur chargement logs:', error);
+        });
+}
+
+// Charger les logs au démarrage
+document.addEventListener('DOMContentLoaded', loadSessionLogs);
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,509 @@
+{##}
+{#{% extends 'base.html' %}#}
+{##}
+{#{% block title %}Upload Document - RegAnnotator{% endblock %}#}
+{#{% block page_title %}Nouveau Document{% endblock %}#}
+{##}
+{#{% block content %}#}
+{#<div class="row justify-content-center">#}
+{#    <div class="col-md-8">#}
+{#        <div class="stat-card">#}
+{#            <h5 class="mb-4">Télécharger un Nouveau Document PDF</h5>#}
+{##}
+{#            <form method="post" enctype="multipart/form-data">#}
+{#                {% csrf_token %}#}
+{##}
+{#                <div class="row">#}
+{#                    <div class="col-md-6">#}
+{#                        <div class="mb-3">#}
+{#                            <label for="{{ form.title.id_for_label }}" class="form-label">#}
+{#                                Titre du document <span class="text-danger">*</span>#}
+{#                            </label>#}
+{#                            {{ form.title }}#}
+{#                            {% if form.title.errors %}#}
+{#                                <div class="text-danger small">{{ form.title.errors }}</div>#}
+{#                            {% endif %}#}
+{#                        </div>#}
+{##}
+{#                        <div class="mb-3">#}
+{#                            <label for="{{ form.file.id_for_label }}" class="form-label">#}
+{#                                Fichier PDF <span class="text-danger">*</span>#}
+{#                            </label>#}
+{#                            {{ form.file }}#}
+{#                            {% if form.file.errors %}#}
+{#                                <div class="text-danger small">{{ form.file.errors }}</div>#}
+{#                            {% endif %}#}
+{#                            <div class="form-text">Taille maximum: 50MB</div>#}
+{#                        </div>#}
+{##}
+{#                        <div class="mb-3">#}
+{#                            <label for="{{ form.document_type.id_for_label }}" class="form-label">#}
+{#                                Type de document <span class="text-danger">*</span>#}
+{#                            </label>#}
+{#                            {{ form.document_type }}#}
+{#                            {% if form.document_type.errors %}#}
+{#                                <div class="text-danger small">{{ form.document_type.errors }}</div>#}
+{#                            {% endif %}#}
+{#                        </div>#}
+{#                    </div>#}
+{##}
+{#                    <div class="col-md-6">#}
+{##}
+{#                        <div class="mb-3">#}
+{#                            <label for="{{ form.language.id_for_label }}" class="form-label">Langue</label>#}
+{#                            {{ form.language }}#}
+{#                            {% if form.language.errors %}#}
+{#                                <div class="text-danger small">{{ form.language.errors }}</div>#}
+{#                            {% endif %}#}
+{#                        </div>#}
+{##}
+{#                        <div class="mb-3">#}
+{#                            <label for="{{ form.version.id_for_label }}" class="form-label">Version (optionnel)</label>#}
+{#                            {{ form.version }}#}
+{#                            {% if form.version.errors %}#}
+{#                                <div class="text-danger small">{{ form.version.errors }}</div>#}
+{#                            {% endif %}#}
+{#                        </div>#}
+{##}
+{#                        <div class="mb-3">#}
+{#                            <label for="{{ form.url_source.id_for_label }}" class="form-label">URL source (optionnel)</label>#}
+{#                            {{ form.url_source }}#}
+{#                            {% if form.url_source.errors %}#}
+{#                                <div class="text-danger small">{{ form.url_source.errors }}</div>#}
+{#                            {% endif %}#}
+{#                        </div>#}
+{#                    </div>#}
+{#                </div>#}
+{##}
+{#                <div class="alert alert-info">#}
+{#                    <i class="fas fa-info-circle"></i>#}
+{#                    <strong>Information:</strong> Une fois téléchargé, le document sera automatiquement traité pour #}
+{#                    extraire le texte et le segmenter en phrases. Vous pourrez ensuite lancer l'annotation automatique.#}
+{#                </div>#}
+{##}
+{#                <div class="d-flex justify-content-between">#}
+{#                    <a href="{% url 'dashboard:document_list' %}" class="btn btn-secondary">#}
+{#                        <i class="fas fa-arrow-left"></i> Retour#}
+{#                    </a>#}
+{#                    <button type="submit" class="btn btn-primary">#}
+{#                        <i class="fas fa-upload"></i> Télécharger et Traiter#}
+{#                    </button>#}
+{#                </div>#}
+{#            </form>#}
+{#        </div>#}
+{#    </div>#}
+{#</div>#}
+{##}
+{#<!-- Aide -->#}
+{#<div class="row justify-content-center mt-4">#}
+{#    <div class="col-md-8">#}
+{#        <div class="stat-card">#}
+{#            <h6 class="mb-3">💡 Conseils pour un meilleur traitement</h6>#}
+{#            <ul class="list-unstyled">#}
+{#                <li class="mb-2">#}
+{#                    <i class="fas fa-check-circle text-success me-2"></i>#}
+{#                    Utilisez des PDF avec du texte sélectionnable (pas d'images scannées)#}
+{#                </li>#}
+{#                <li class="mb-2">#}
+{#                    <i class="fas fa-check-circle text-success me-2"></i>#}
+{#                    Assurez-vous que le titre est descriptif et unique#}
+{#                </li>#}
+{#                <li class="mb-2">#}
+{#                    <i class="fas fa-check-circle text-success me-2"></i>#}
+{#                    Sélectionnez la bonne source et le bon type de document#}
+{#                </li>#}
+{#                <li class="mb-2">#}
+{#                    <i class="fas fa-check-circle text-success me-2"></i>#}
+{#                    Les documents en anglais donnent généralement de meilleurs résultats#}
+{#                </li>#}
+{#            </ul>#}
+{#        </div>#}
+{#    </div>#}
+{#</div>#}
+{#{% endblock %}#}
+{##}
+{#{% block extra_js %}#}
+{#<script>#}
+{#// Prévisualisation du fichier#}
+{#document.getElementById('{{ form.file.id_for_label }}').addEventListener('change', function(e) {#}
+{#    const file = e.target.files[0];#}
+{#    if (file) {#}
+{#        const fileSize = (file.size / 1024 / 1024).toFixed(2);#}
+{#        console.log(`Fichier sélectionné: ${file.name} (${fileSize} MB)`);#}
+{##}
+{#        if (file.size > 50 * 1024 * 1024) {#}
+{#            alert('Attention: Le fichier dépasse 50MB. Le traitement pourrait être lent.');#}
+{#        }#}
+{#    }#}
+{#});#}
+{##}
+{#// Auto-complétion du titre basé sur le nom du fichier#}
+{#document.getElementById('{{ form.file.id_for_label }}').addEventListener('change', function(e) {#}
+{#    const file = e.target.files[0];#}
+{#    const titleField = document.getElementById('{{ form.title.id_for_label }}');#}
+{##}
+{#    if (file && !titleField.value) {#}
+{#        // Enlever l'extension et nettoyer le nom#}
+{#        let cleanName = file.name.replace(/\.[^/.]+$/, "");#}
+{#        cleanName = cleanName.replace(/[_-]/g, ' ');#}
+{#        titleField.value = cleanName;#}
+{#    }#}
+{#});#}
+{#</script>#}
+{#{% endblock %}#}
+
+{% extends 'base.html' %}
+
+{% block title %}Upload Document - RegAnnotator{% endblock %}
+{% block page_title %}Nouveau Document avec Extraction Automatique{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0">📄 Télécharger un Nouveau Document</h5>
+                <div class="btn-group" role="group">
+                    <a href="{% url 'documents:bulk_upload' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-upload"></i> Upload en lot
+                    </a>
+                    <a href="{% url 'dashboard:document_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-list"></i> Liste des documents
+                    </a>
+                </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data" id="uploadForm">
+                {% csrf_token %}
+
+                <div class="row">
+                    <!-- Section Fichier/URL -->
+                    <div class="col-md-6">
+                        <div class="card border-primary mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="fas fa-file"></i> Source du Document</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="{{ form.file.id_for_label }}" class="form-label">
+                                        Fichier Local
+                                    </label>
+                                    {{ form.file }}
+                                    {% if form.file.errors %}
+                                        <div class="text-danger small">{{ form.file.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Formats supportés: PDF, DOC, DOCX, TXT, HTML, RTF, ODT<br>
+                                        Taille maximum: 100MB
+                                    </div>
+                                </div>
+
+                                <div class="text-center my-3">
+                                    <strong>OU</strong>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="{{ form.url_document.id_for_label }}" class="form-label">
+                                        URL du Document
+                                    </label>
+                                    {{ form.url_document }}
+                                    {% if form.url_document.errors %}
+                                        <div class="text-danger small">{{ form.url_document.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Le document sera téléchargé automatiquement depuis cette URL
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section Métadonnées -->
+                    <div class="col-md-6">
+                        <div class="card border-success mb-3">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-tags"></i> Métadonnées (Extraction Automatique)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="{{ form.title.id_for_label }}" class="form-label">
+                                        Titre du document
+                                    </label>
+                                    {{ form.title }}
+                                    {% if form.title.errors %}
+                                        <div class="text-danger small">{{ form.title.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text text-success">
+                                        <i class="fas fa-magic"></i> {{ form.title.help_text }}
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ form.document_type.id_for_label }}" class="form-label">
+                                                Type de document
+                                            </label>
+                                            {{ form.document_type }}
+                                            {% if form.document_type.errors %}
+                                                <div class="text-danger small">{{ form.document_type.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text text-success">
+                                                <i class="fas fa-magic"></i> {{ form.document_type.help_text }}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ form.language.id_for_label }}" class="form-label">Langue</label>
+                                            {{ form.language }}
+                                            {% if form.language.errors %}
+                                                <div class="text-danger small">{{ form.language.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text text-success">
+                                                <i class="fas fa-magic"></i> {{ form.language.help_text }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ form.version.id_for_label }}" class="form-label">Version</label>
+                                            {{ form.version }}
+                                            {% if form.version.errors %}
+                                                <div class="text-danger small">{{ form.version.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="{{ form.context.id_for_label }}" class="form-label">Contexte</label>
+                                            {{ form.context }}
+                                            <div class="form-text">{{ form.context.help_text }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="{{ form.url_source.id_for_label }}" class="form-label">URL source officielle</label>
+                                    {{ form.url_source }}
+                                    {% if form.url_source.errors %}
+                                        <div class="text-danger small">{{ form.url_source.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options avancées -->
+                <div class="card border-warning mb-3">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0"><i class="fas fa-cogs"></i> Options Avancées</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check">
+                            {{ form.force_manual_metadata }}
+                            <label class="form-check-label" for="{{ form.force_manual_metadata.id_for_label }}">
+                                {{ form.force_manual_metadata.label }}
+                            </label>
+                            <div class="form-text">{{ form.force_manual_metadata.help_text }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{% url 'dashboard:document_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                    
+                    <div>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-upload"></i> Télécharger et Traiter
+                        </button>
+                        <div class="d-none" id="loadingSpinner">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Traitement en cours...
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Aide et informations -->
+<div class="row justify-content-center mt-4">
+    <div class="col-md-10">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="stat-card">
+                    <h6 class="mb-3">🤖 Extraction Automatique</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Titre:</strong> Extrait automatiquement du document
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Date:</strong> Recherche des dates de publication
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Langue:</strong> Détection automatique de la langue
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Source:</strong> Identification des organismes (EMA, FDA, etc.)
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <strong>Version:</strong> Extraction des numéros de version
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="stat-card">
+                    <h6 class="mb-3">💡 Conseils pour un meilleur traitement</h6>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Utilisez des documents avec du texte sélectionnable
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Les documents officiels donnent de meilleurs résultats
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Sélectionnez le bon contexte pour améliorer l'extraction
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Vous pourrez modifier les métadonnées après traitement
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('{{ form.file.id_for_label }}');
+    const urlInput = document.getElementById('{{ form.url_document.id_for_label }}');
+    const titleInput = document.getElementById('{{ form.title.id_for_label }}');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    // Auto-complétion du titre basé sur le nom du fichier
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file && !titleInput.value) {
+            // Enlever l'extension et nettoyer le nom
+            let cleanName = file.name.replace(/\.[^/.]+$/, "");
+            cleanName = cleanName.replace(/[_-]/g, ' ');
+            cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+            titleInput.value = cleanName;
+        }
+        
+        // Afficher la taille du fichier
+        if (file) {
+            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+            console.log(`Fichier sélectionné: ${file.name} (${fileSize} MB)`);
+            
+            if (file.size > 100 * 1024 * 1024) {
+                alert('Attention: Le fichier dépasse 100MB. Le traitement pourrait être lent.');
+            }
+        }
+        
+        // Clear URL si fichier sélectionné
+        if (file) {
+            urlInput.value = '';
+        }
+    });
+    
+    // Clear fichier si URL saisie
+    urlInput.addEventListener('input', function() {
+        if (this.value.trim()) {
+            fileInput.value = '';
+            
+            // Essayer d'extraire le nom du fichier de l'URL
+            if (!titleInput.value) {
+                try {
+                    const url = new URL(this.value);
+                    const pathname = url.pathname;
+                    const filename = pathname.split('/').pop();
+                    if (filename) {
+                        let cleanName = filename.replace(/\.[^/.]+$/, "");
+                        cleanName = cleanName.replace(/[_-]/g, ' ');
+                        cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                        titleInput.value = cleanName;
+                    }
+                } catch (e) {
+                    // URL invalide, ignorer
+                }
+            }
+        }
+    });
+    
+    // Animation de soumission
+    form.addEventListener('submit', function() {
+        submitBtn.classList.add('d-none');
+        loadingSpinner.classList.remove('d-none');
+    });
+    
+    // Drag & Drop
+    const fileDropZone = document.querySelector('.card-body');
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        fileDropZone.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileDropZone.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        fileDropZone.addEventListener(eventName, unhighlight, false);
+    });
+    
+    function highlight(e) {
+        fileDropZone.classList.add('border-primary', 'bg-light');
+    }
+    
+    function unhighlight(e) {
+        fileDropZone.classList.remove('border-primary', 'bg-light');
+    }
+    
+    fileDropZone.addEventListener('drop', handleDrop, false);
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            fileInput.files = files;
+            // Déclencher l'événement change
+            fileInput.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
+{% endblock %}

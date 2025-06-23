@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+
+{% block title %}Liste des Experts - RegAnnotator{% endblock %}
+{% block page_title %}Gestion des Experts{% endblock %}
+
+{% block content %}
+<!-- Filtres et actions -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <select name="expertise_level" class="form-select">
+                        <option value="">Tous les niveaux</option>
+                        {% for value, label in expertise_levels %}
+                            <option value="{{ value }}" {% if current_filters.expertise_level == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="specialization" class="form-select">
+                        <option value="">Toutes spécialités</option>
+                        {% for value, label in specializations %}
+                            <option value="{{ value }}" {% if current_filters.specialization == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="is_active" class="form-select">
+                        <option value="">Tous</option>
+                        <option value="true" {% if current_filters.is_active == 'true' %}selected{% endif %}>Actifs</option>
+                        <option value="false" {% if current_filters.is_active == 'false' %}selected{% endif %}>Inactifs</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Filtrer
+                        </button>
+                        <a href="{% url 'experts:expert_list' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Reset
+                        </a>
+                        <button type="button" class="btn btn-outline-info" onclick="exportExperts()">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card text-center">
+            <a href="{% url 'experts:create_profile' %}" class="btn btn-success">
+                <i class="fas fa-user-plus"></i> Nouvel Expert
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des experts -->
+<div class="stat-card">
+    <h5 class="mb-3">
+        Experts Pharmaceutiques
+        <span class="badge bg-secondary ms-2">{{ page_obj.paginator.count }}</span>
+    </h5>
+    
+    {% if page_obj %}
+        <div class="row">
+            {% for expert in page_obj %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <!-- En-tête expert -->
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="me-3">
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                                         style="width: 50px; height: 50px; font-size: 1.2rem;">
+                                        {{ expert.user.first_name.0|default:expert.user.username.0|upper }}
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="card-title mb-1">{{ expert.user.get_full_name|default:expert.user.username }}</h6>
+                                    <p class="card-text text-muted small mb-0">{{ expert.company|default:"Indépendant" }}</p>
+                                </div>
+                                <div>
+                                    {% if expert.is_active %}
+                                        <span class="badge bg-success">Actif</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactif</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Informations clés -->
+                            <div class="mb-3">
+                                <div class="row text-center">
+                                    <div class="col-4">
+                                        <div class="border-end">
+                                            <div class="h6 text-primary mb-0">{{ expert.total_annotations_validated }}</div>
+                                            <small class="text-muted">Validations</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="border-end">
+                                            <div class="h6 text-success mb-0">{{ expert.accuracy_score|floatformat:0 }}%</div>
+                                            <small class="text-muted">Précision</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="h6 text-info mb-0">{{ expert.years_experience }}</div>
+                                        <small class="text-muted">Années</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Niveau et position -->
+                            <div class="mb-3">
+                                <span class="badge bg-{% if expert.expertise_level == 'expert' %}danger{% elif expert.expertise_level == 'senior' %}success{% elif expert.expertise_level == 'confirmed' %}info{% else %}warning{% endif %} me-2">
+                                    {{ expert.get_expertise_level_display }}
+                                </span>
+                                {% if expert.position %}
+                                    <small class="text-muted">{{ expert.position|truncatechars:20 }}</small>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Spécialités -->
+                            {% if expert.specializations %}
+                                <div class="mb-3">
+                                    <small class="text-muted d-block mb-1">Spécialités:</small>
+                                    {% for spec in expert.specializations|slice:":2" %}
+                                        <span class="badge bg-light text-dark me-1">{{ spec }}</span>
+                                    {% endfor %}
+                                    {% if expert.specializations|length > 2 %}
+                                        <span class="badge bg-light text-dark">+{{ expert.specializations|length|add:"-2" }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Dernière activité -->
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-clock"></i>
+                                    {% if expert.last_activity %}
+                                        Actif {{ expert.last_activity|timesince }}
+                                    {% else %}
+                                        Jamais connecté
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="card-footer bg-transparent border-0">
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'experts:expert_detail' expert.id %}" 
+                                   class="btn btn-outline-primary btn-sm flex-grow-1">
+                                    <i class="fas fa-eye"></i> Détails
+                                </a>
+                                <a href="{% url 'experts:expert_tasks' expert.id %}" 
+                                   class="btn btn-outline-info btn-sm">
+                                    <i class="fas fa-tasks"></i>
+                                </a>
+                                <a href="{% url 'experts:expert_analytics' expert.id %}" 
+                                   class="btn btn-outline-success btn-sm">
+                                    <i class="fas fa-chart-bar"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <nav aria-label="Navigation des experts" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Premier</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Précédent</a>
+                        </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Suivant</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Dernier</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-user-friends fa-3x text-muted mb-3"></i>
+            <h6 class="text-muted">Aucun expert trouvé</h6>
+            <p class="text-muted">Commencez par créer votre premier profil d'expert.</p>
+            <a href="{% url 'experts:create_profile' %}" class="btn btn-primary">
+                <i class="fas fa-user-plus"></i> Créer un Expert
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function exportExperts() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    window.open('/experts/export/?' + params.toString());
+}
+</script>
+{% endblock %}

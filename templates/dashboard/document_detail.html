@@ -1,0 +1,879 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ document.title }} - RegAnnotator{% endblock %}
+{% block page_title %}{{ document.title|truncatechars:50 }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .entity-selector {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+
+    .entity-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 25px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        backdrop-filter: blur(4px);
+    }
+
+    .entity-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .entity-btn.selected {
+        background: rgba(255, 255, 255, 0.9);
+        color: #333;
+        border-color: #fff;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .entity-count {
+        background: rgba(255, 255, 255, 0.9);
+        color: #333;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        margin-left: 8px;
+        font-weight: 700;
+        min-width: 20px;
+        display: inline-block;
+        text-align: center;
+    }
+
+    .entity-btn.selected .entity-count {
+        background: rgba(51, 51, 51, 0.9);
+        color: white;
+    }
+
+    .annotation-workspace {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        min-height: 400px;
+    }
+
+    .sentence-text {
+        font-size: 18px;
+        line-height: 1.8;
+        color: #333;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        user-select: text;
+        position: relative;
+        padding: 20px;
+        background: #fafbfc;
+        border-radius: 12px;
+        border: 2px dashed #e9ecef;
+        transition: all 0.3s ease;
+        min-height: 200px;
+    }
+
+    .sentence-text:hover {
+        border-color: #667eea;
+        background: #f8f9ff;
+    }
+
+    .annotation-wrapper {
+        display: inline;
+        position: relative;
+    }
+
+    .annotation-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #333;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 1px 4px;
+        border-radius: 2px;
+        margin-right: 4px;
+        vertical-align: baseline;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-block;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .annotation-highlight {
+        padding: 3px 6px;
+        border-radius: 4px;
+        margin: 0 1px;
+        position: relative;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .annotation-highlight:hover {
+        transform: scale(1.02);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        opacity: 0.8;
+    }
+
+    .stats-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+        border-radius: 10px;
+    }
+
+    .stat-item {
+        text-align: center;
+        flex: 1;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #495057;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+
+    .annotation-panel {
+        position: fixed;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 300px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        z-index: 1000;
+        max-height: 70vh;
+        overflow-y: auto;
+        display: none;
+    }
+
+    .annotation-list-item {
+        background: #f8f9fa;
+        padding: 10px;
+        margin: 8px 0;
+        border-radius: 8px;
+        border-left: 4px solid;
+    }
+
+    .source-info {
+        text-align: right;
+        margin-top: 30px;
+        padding: 15px;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border-radius: 10px;
+        font-size: 14px;
+        color: #1565c0;
+    }
+
+    @keyframes highlight-flash {
+        0% { background-color: rgba(255, 235, 59, 0.8); }
+        100% { background-color: transparent; }
+    }
+
+    .flash-highlight {
+        animation: highlight-flash 0.5s ease-out;
+    }
+
+    .success-notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 25px;
+        font-size: 14px;
+        z-index: 2000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+
+    .success-notification.show {
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<div class="container-fluid">
+    <!-- Header du document -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h4>{{ document.title }}</h4>
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-building"></i> {{ document.source.name }} ({{ document.source.acronym }})
+                            <span class="mx-2">•</span>
+                            <i class="fas fa-calendar"></i> {{ document.publication_date|date:"d/m/Y"|default:"Non spécifiée" }}
+                        </p>
+                        <div>
+                            <span class="badge bg-primary me-2">{{ document.get_document_type_display }}</span>
+                            <span class="badge bg-secondary me-2">{{ document.get_language_display }}</span>
+                            <span class="badge bg-{{ document.status|yesno:'success,warning,danger' }}">
+                                {{ document.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        {% if document.status == 'uploaded' %}
+                            <a href="{% url 'dashboard:process_document' document.id %}" 
+                               class="btn btn-primary">
+                                <i class="fas fa-brain"></i> Traiter avec IA
+                            </a>
+                        {% endif %}
+                        <button class="btn btn-outline-success" onclick="toggleAnnotationPanel()">
+                            <i class="fas fa-list"></i> Annotations
+                        </button>
+                        <a href="{{ document.file.url }}" target="_blank" class="btn btn-outline-primary">
+                            <i class="fas fa-download"></i> Télécharger PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <div class="stat-value">{{ total_sentences }}</div>
+                    <div class="stat-label">Phrases</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="annotation-count">{{ total_annotations }}</div>
+                    <div class="stat-label">Annotations</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sélecteur d'entités -->
+    <div class="entity-selector">
+        <h5 class="text-white mb-3">
+            <i class="fas fa-tags"></i> Sélectionnez un type d'entité pour annoter
+        </h5>
+        <div class="d-flex flex-wrap">
+            {% for entity in entity_types %}
+                <button class="entity-btn" 
+                        data-entity-id="{{ entity.id }}"
+                        data-entity-name="{{ entity.name }}"
+                        data-entity-color="{{ entity.color|default:'#007bff' }}"
+                        onclick="selectEntity(this)">
+                    {{ entity.name|upper }}
+                    <span class="entity-count" id="count-{{ entity.id }}">{{ entity.annotations_count|default:0 }}</span>
+                </button>
+            {% endfor %}
+        </div>
+        <p class="text-white-50 mt-2">
+            <i class="fas fa-magic"></i> 
+            Sélectionnez une entité puis surlignez le texte - l'annotation se crée automatiquement !
+        </p>
+    </div>
+
+    <!-- Interface d'annotation -->
+    <div class="annotation-workspace">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5><i class="fas fa-edit"></i> Interface d'Annotation</h5>
+            <div>
+                <button class="btn btn-sm btn-outline-info" onclick="reloadAnnotations()">
+                    <i class="fas fa-refresh"></i> Recharger
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearNewAnnotations()">
+                    <i class="fas fa-eraser"></i> Effacer nouvelles
+                </button>
+                <button class="btn btn-sm btn-outline-success" onclick="saveAnnotations()">
+                    <i class="fas fa-save"></i> Sauvegarder
+                </button>
+            </div>
+        </div>
+
+        <!-- Zone de texte annotable -->
+        <div class="sentence-text" id="text-area" onmouseup="handleSelection()">
+            {% for sentence in page_obj %}
+                <span class="sentence-item"
+                      data-sentence-id="{{ sentence.id }}"
+                      data-original-text="{{ sentence.text|escape }}"
+                      data-annotations='{{ sentence.annotations_json|safe }}'>
+                    {{ sentence.text }}
+                    {% if not forloop.last %} {% endif %}
+                </span>
+            {% endfor %}
+        </div>
+
+        <!-- Info entité sélectionnée -->
+        <div id="entity-info" class="mt-3 p-3 bg-light rounded" style="display: none;">
+            <i class="fas fa-tag"></i> 
+            <strong>Mode annotation activé :</strong> <span id="selected-entity-name"></span>
+            <small class="d-block mt-1">Surlignez du texte pour créer une annotation automatiquement</small>
+        </div>
+
+        <!-- Source -->
+        <div class="source-info">
+            <strong>SOURCE:</strong> {{ document.source.name|default:"Document Réglementaire" }}
+        </div>
+    </div>
+</div>
+
+<!-- Panneau des annotations -->
+<div class="annotation-panel" id="annotation-panel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6><i class="fas fa-list"></i> Annotations</h6>
+        <button class="btn btn-sm btn-outline-secondary" onclick="toggleAnnotationPanel()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div id="annotation-list">
+        <!-- Les annotations seront chargées ici dynamiquement -->
+    </div>
+</div>
+
+<!-- Notification de succès -->
+<div class="success-notification" id="success-notification">
+    <i class="fas fa-check"></i> <span id="notification-text">Annotation créée</span>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+    <nav aria-label="Navigation des phrases" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1">Premier</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Précédent</a>
+                </li>
+            {% endif %}
+            
+            <li class="page-item active">
+                <span class="page-link">
+                    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                </span>
+            </li>
+            
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Suivant</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Dernier</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endif %}
+
+<script>
+let selectedEntity = null;
+let annotations = [];
+
+// Couleurs par défaut pour les entités
+function getEntityColor(entityName) {
+    const colors = {
+        'VARIATION_CODE': '#FFD700',      // Or
+        'PROCEDURE_TYPE': '#87CEEB',      // Bleu ciel
+        'AUTHORITY': '#98FB98',           // Vert menthe
+        'LEGAL_REFERENCE': '#DDA0DD',     // Prune
+        'DOCUMENT_REQUIRED': '#F0E68C',   // Kaki
+        'CONDITION_REQUIRED': '#FFA07A',  // Saumon
+        'TIMELINE': '#D3D3D3',            // Gris
+        'DOSSIER_TYPE': '#E6E6FA',        // Lavande
+        'COUNTRY': '#FFB6C1'              // Rose clair
+    };
+    return colors[entityName.toUpperCase()] || '#E6E6FA';
+}
+
+// ============= INITIALISATION CORRIGÉE =============
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Initialisation de l\'interface d\'annotation');
+    initializeAnnotationSystem();
+});
+
+function initializeAnnotationSystem() {
+    // 1. Réinitialiser
+    annotations = [];
+    
+    // 2. Charger les annotations existantes depuis les données du template
+    loadExistingAnnotationsFromData();
+    
+    // 3. Appliquer visuellement toutes les annotations
+    applyAllAnnotationsVisually();
+    
+    // 4. Mettre à jour l'interface
+    updateAnnotationCount();
+    updateAnnotationPanel();
+    
+    // 5. Configuration
+    setupAnnotationInterface();
+    
+    console.log(`✅ Système initialisé avec ${annotations.length} annotations`);
+}
+
+// ============= CHARGEMENT CORRIGÉ DES ANNOTATIONS =============
+function loadExistingAnnotationsFromData() {
+    console.log('📥 Chargement des annotations depuis les données...');
+    
+    let totalLoaded = 0;
+    
+    document.querySelectorAll('.sentence-item').forEach(sentenceElement => {
+        const sentenceId = sentenceElement.dataset.sentenceId;
+        const annotationsData = sentenceElement.dataset.annotations;
+        
+        if (annotationsData && annotationsData.trim() !== '' && annotationsData !== '[]') {
+            try {
+                const sentenceAnnotations = JSON.parse(annotationsData);
+                
+                sentenceAnnotations.forEach(ann => {
+                    // Validation des données
+                    if (ann && ann.entityType && ann.text) {
+                        annotations.push({
+                            id: ann.id,
+                            text: ann.text,
+                            entityType: {
+                                id: ann.entityType.id,
+                                name: ann.entityType.name,
+                                color: ann.entityType.color || getEntityColor(ann.entityType.name)
+                            },
+                            sentenceId: sentenceId,
+                            startOffset: ann.startOffset || 0,
+                            endOffset: ann.endOffset || ann.text.length,
+                            validationStatus: ann.validationStatus || 'validated',
+                            isExisting: true
+                        });
+                        totalLoaded++;
+                    }
+                });
+                
+                console.log(`📄 Phrase ${sentenceId}: ${sentenceAnnotations.length} annotations`);
+            } catch (e) {
+                console.error(`❌ Erreur parsing phrase ${sentenceId}:`, e);
+            }
+        }
+    });
+    
+    console.log(`📊 Total chargé: ${totalLoaded} annotations`);
+}
+
+// ============= APPLICATION VISUELLE CORRIGÉE =============
+function applyAllAnnotationsVisually() {
+    console.log('🎨 Application visuelle des annotations...');
+    
+    // Grouper par phrase
+    const annotationsBySentence = {};
+    annotations.forEach(annotation => {
+        if (!annotationsBySentence[annotation.sentenceId]) {
+            annotationsBySentence[annotation.sentenceId] = [];
+        }
+        annotationsBySentence[annotation.sentenceId].push(annotation);
+    });
+    
+    // Appliquer pour chaque phrase
+    Object.keys(annotationsBySentence).forEach(sentenceId => {
+        const sentenceElement = document.querySelector(`[data-sentence-id="${sentenceId}"]`);
+        if (sentenceElement) {
+            const originalText = sentenceElement.dataset.originalText;
+            const sentenceAnnotations = annotationsBySentence[sentenceId];
+            
+            // Trier par position de début
+            sentenceAnnotations.sort((a, b) => (a.startOffset || 0) - (b.startOffset || 0));
+            
+            const annotatedHtml = applyAnnotationsToText(originalText, sentenceAnnotations);
+            sentenceElement.innerHTML = annotatedHtml;
+            
+            console.log(`✨ Phrase ${sentenceId}: ${sentenceAnnotations.length} annotations appliquées`);
+        }
+    });
+}
+
+function applyAnnotationsToText(text, annotationsForText) {
+    if (!annotationsForText || annotationsForText.length === 0) {
+        return text;
+    }
+    
+    // Trier par position décroissante pour éviter les conflits d'index
+    const sorted = [...annotationsForText].sort((a, b) => (b.startOffset || 0) - (a.startOffset || 0));
+    
+    let result = text;
+    
+    sorted.forEach(annotation => {
+        const start = Math.max(0, annotation.startOffset || 0);
+        const end = Math.min(text.length, annotation.endOffset || annotation.text.length);
+        
+        if (start < end && start < result.length) {
+            const beforeText = result.substring(0, start);
+            const annotatedText = result.substring(start, end);
+            const afterText = result.substring(end);
+            
+            const color = annotation.entityType.color;
+            const name = annotation.entityType.name;
+            
+            const wrapper = `<span class="annotation-wrapper">` +
+                           `<span class="annotation-label">${name}</span>` +
+                           `<span class="annotation-highlight" ` +
+                           `style="background-color: ${color};" ` +
+                           `data-annotation-id="${annotation.id}" ` +
+                           `onclick="editAnnotation('${annotation.id}')">${annotatedText}</span>` +
+                           `</span>`;
+            
+            result = beforeText + wrapper + afterText;
+        }
+    });
+    
+    return result;
+}
+
+// ============= FONCTIONS D'INTERFACE =============
+function selectEntity(button) {
+    // Désélectionner les autres
+    document.querySelectorAll('.entity-btn').forEach(btn => btn.classList.remove('selected'));
+    
+    // Sélectionner celle-ci
+    button.classList.add('selected');
+    selectedEntity = {
+        id: button.dataset.entityId,
+        name: button.dataset.entityName,
+        color: button.dataset.entityColor || getEntityColor(button.dataset.entityName)
+    };
+    
+    // Afficher l'info
+    document.getElementById('entity-info').style.display = 'block';
+    document.getElementById('selected-entity-name').textContent = selectedEntity.name;
+    document.getElementById('selected-entity-name').style.color = selectedEntity.color;
+    
+    console.log('🏷️ Entité sélectionnée:', selectedEntity.name);
+}
+
+function handleSelection() {
+    const selection = window.getSelection();
+    
+    if (selection.rangeCount > 0 && !selection.isCollapsed) {
+        const selectedText = selection.toString().trim();
+        
+        if (selectedText.length > 0 && selectedEntity) {
+            // Créer l'annotation
+            const annotation = {
+                id: 'new_' + Date.now(),
+                text: selectedText,
+                entityType: selectedEntity,
+                sentenceId: findSentenceId(selection.getRangeAt(0)),
+                isNew: true,
+                startOffset: 0,
+                endOffset: selectedText.length
+            };
+            
+            annotations.push(annotation);
+            
+            // Appliquer visuellement
+            applyAnnotation(selection.getRangeAt(0), selectedText, selectedEntity, annotation.id);
+            
+            // Nettoyer la sélection
+            selection.removeAllRanges();
+            
+            // Mettre à jour l'interface
+            updateAnnotationCount();
+            updateAnnotationPanel();
+            showSuccessNotification('✅ Annotation créée');
+            
+            console.log('➕ Nouvelle annotation:', selectedText, 'comme', selectedEntity.name);
+        } else if (selectedText.length > 0 && !selectedEntity) {
+            showSuccessNotification('⚠️ Sélectionnez d\'abord une entité', 'warning');
+        }
+    }
+}
+
+function findSentenceId(range) {
+    let node = range.startContainer;
+    while (node && node.nodeType !== Node.ELEMENT_NODE) {
+        node = node.parentNode;
+    }
+    while (node && !node.classList.contains('sentence-item')) {
+        node = node.parentNode;
+    }
+    return node ? node.dataset.sentenceId : null;
+}
+
+function applyAnnotation(range, text, entity, annotationId) {
+    try {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'annotation-wrapper';
+        
+        const label = document.createElement('span');
+        label.className = 'annotation-label';
+        label.textContent = entity.name;
+        
+        const highlight = document.createElement('span');
+        highlight.className = 'annotation-highlight';
+        highlight.style.backgroundColor = entity.color;
+        highlight.textContent = text;
+        highlight.dataset.annotationId = annotationId;
+        highlight.onclick = () => editAnnotation(annotationId);
+        
+        wrapper.appendChild(label);
+        wrapper.appendChild(highlight);
+        
+        range.deleteContents();
+        range.insertNode(wrapper);
+        
+        console.log('🎨 Annotation appliquée:', {text, entity: entity.name, color: entity.color});
+    } catch (e) {
+        console.error('❌ Erreur annotation:', e);
+    }
+}
+
+// ============= FONCTIONS UTILITAIRES =============
+function reloadAnnotations() {
+    console.log('🔄 Rechargement des annotations...');
+    
+    // Réinitialiser toutes les phrases au texte original
+    document.querySelectorAll('.sentence-item').forEach(sentenceElement => {
+        const originalText = sentenceElement.dataset.originalText;
+        sentenceElement.innerHTML = originalText;
+    });
+    
+    // Relancer l'initialisation
+    initializeAnnotationSystem();
+    showSuccessNotification('🔄 Annotations rechargées');
+}
+
+function clearNewAnnotations() {
+    if (confirm('Effacer toutes les nouvelles annotations ?')) {
+        // Retirer les nouvelles annotations
+        annotations = annotations.filter(a => !a.isNew);
+        
+        // Réappliquer visuellement
+        document.querySelectorAll('.sentence-item').forEach(sentenceElement => {
+            const originalText = sentenceElement.dataset.originalText;
+            sentenceElement.innerHTML = originalText;
+        });
+        
+        applyAllAnnotationsVisually();
+        updateAnnotationCount();
+        updateAnnotationPanel();
+        showSuccessNotification('🗑️ Nouvelles annotations effacées');
+    }
+}
+
+function saveAnnotations() {
+    const newAnnotations = annotations.filter(a => a.isNew);
+    
+    if (newAnnotations.length === 0) {
+        showSuccessNotification('ℹ️ Aucune nouvelle annotation à sauvegarder', 'warning');
+        return;
+    }
+    
+    console.log('💾 Sauvegarde de', newAnnotations.length, 'annotations');
+    
+    fetch('/api/annotations/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            annotations: newAnnotations.map(a => ({
+                text: a.text,
+                entityTypeId: a.entityType.id,
+                sentenceId: a.sentenceId,
+                startOffset: a.startOffset || 0,
+                endOffset: a.endOffset || a.text.length
+            })),
+            documentId: {{ document.id }}
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccessNotification(`💾 ${newAnnotations.length} annotations sauvegardées !`);
+            annotations.forEach(a => {
+                if (a.isNew) {
+                    a.isNew = false;
+                    a.isExisting = true;
+                }
+            });
+            updateAnnotationPanel();
+        } else {
+            showSuccessNotification('❌ Erreur lors de la sauvegarde', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('❌ Erreur:', error);
+        showSuccessNotification('❌ Erreur lors de la sauvegarde', 'error');
+    });
+}
+
+function updateAnnotationCount() {
+    const totalCount = annotations.length;
+    document.getElementById('annotation-count').textContent = totalCount;
+    
+    // Compter par entité
+    const entityCounts = {};
+    annotations.forEach(annotation => {
+        const entityName = annotation.entityType.name;
+        entityCounts[entityName] = (entityCounts[entityName] || 0) + 1;
+    });
+    
+    // Mettre à jour les compteurs sur les boutons
+    document.querySelectorAll('.entity-btn').forEach(btn => {
+        const entityName = btn.dataset.entityName;
+        const countElement = btn.querySelector('.entity-count');
+        if (countElement) {
+            countElement.textContent = entityCounts[entityName] || 0;
+        }
+    });
+}
+
+function toggleAnnotationPanel() {
+    const panel = document.getElementById('annotation-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (panel.style.display === 'block') {
+        updateAnnotationPanel();
+    }
+}
+
+function updateAnnotationPanel() {
+    const list = document.getElementById('annotation-list');
+    list.innerHTML = '';
+    
+    if (annotations.length === 0) {
+        list.innerHTML = '<p class="text-muted">Aucune annotation</p>';
+        return;
+    }
+    
+    annotations.forEach(annotation => {
+        const item = document.createElement('div');
+        item.className = 'annotation-list-item';
+        item.style.borderLeftColor = annotation.entityType.color;
+        
+        const statusBadge = annotation.isNew 
+            ? '<small class="text-success">• Nouvelle</small>' 
+            : '<small class="text-info">• Existante</small>';
+        
+        item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="badge" style="background-color: ${annotation.entityType.color};">
+                        ${annotation.entityType.name}
+                    </span>
+                    <div class="mt-1">
+                        <strong>"${annotation.text}"</strong>
+                    </div>
+                    ${statusBadge}
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteAnnotation('${annotation.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+}
+
+function deleteAnnotation(annotationId) {
+    if (confirm('Supprimer cette annotation ?')) {
+        annotations = annotations.filter(a => a.id !== annotationId);
+        
+        // Retirer le surlignage
+        const highlight = document.querySelector(`[data-annotation-id="${annotationId}"]`);
+        if (highlight) {
+            const wrapper = highlight.parentNode;
+            const text = highlight.textContent;
+            wrapper.parentNode.replaceChild(document.createTextNode(text), wrapper);
+        }
+        
+        updateAnnotationCount();
+        updateAnnotationPanel();
+        showSuccessNotification('🗑️ Annotation supprimée');
+    }
+}
+
+function editAnnotation(annotationId) {
+    const annotation = annotations.find(a => a.id === annotationId);
+    if (annotation) {
+        const newText = prompt('Modifier le texte:', annotation.text);
+        if (newText && newText !== annotation.text) {
+            annotation.text = newText;
+            annotation.isNew = true;
+            
+            const highlight = document.querySelector(`[data-annotation-id="${annotationId}"]`);
+            if (highlight) {
+                highlight.textContent = newText;
+            }
+            
+            updateAnnotationPanel();
+            showSuccessNotification('✏️ Annotation modifiée');
+        }
+    }
+}
+
+function showSuccessNotification(text, type = 'success') {
+    const notification = document.getElementById('success-notification');
+    const textElement = document.getElementById('notification-text');
+    
+    textElement.textContent = text;
+    
+    if (type === 'warning') {
+        notification.style.background = '#ffc107';
+        notification.style.color = '#212529';
+    } else if (type === 'error') {
+        notification.style.background = '#dc3545';
+        notification.style.color = 'white';
+    } else {
+        notification.style.background = '#28a745';
+        notification.style.color = 'white';
+    }
+    
+    notification.classList.add('show');
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+    }, 3000);
+}
+
+function setupAnnotationInterface() {
+    document.querySelectorAll('.entity-btn, .btn, .badge').forEach(element => {
+        element.style.userSelect = 'none';
+    });
+    
+    console.log('⚙️ Interface configurée');
+}
+</script>
+
+<!-- Données initiales -->
+<script type="application/json" id="initial-data">
+{
+    "document_id": {{ document.id }},
+    "entity_types": [
+        {% for entity in entity_types %}
+        {
+            "id": {{ entity.id }},
+            "name": "{{ entity.name }}",
+            "color": "{{ entity.color|default:'#007bff' }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+}
+</script>
+
+{% endblock %}

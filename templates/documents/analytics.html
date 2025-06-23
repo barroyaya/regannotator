@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+
+{% block title %}Statistiques des Annotations - RegAnnotator{% endblock %}
+{% block page_title %}Statistiques et Analytics{% endblock %}
+
+{% block content %}
+<!-- Vue d'ensemble -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Total Annotations</h6>
+                    <p class="stat-number text-primary">{{ entity_stats|length }}</p>
+                </div>
+                <div class="text-primary">
+                    <i class="fas fa-tags fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Experts Actifs</h6>
+                    <p class="stat-number text-success">{{ expert_stats|length }}</p>
+                </div>
+                <div class="text-success">
+                    <i class="fas fa-users fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Confiance Moyenne</h6>
+                    <p class="stat-number text-warning">
+                        {% for stat in entity_stats %}
+                            {% if forloop.first %}{{ stat.avg_confidence|floatformat:2 }}{% endif %}
+                        {% endfor %}
+                    </p>
+                </div>
+                <div class="text-warning">
+                    <i class="fas fa-chart-line fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Taux Validation</h6>
+                    <p class="stat-number text-info">85%</p>
+                </div>
+                <div class="text-info">
+                    <i class="fas fa-check-circle fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h5 class="mb-3">Répartition des Annotations par Entité</h5>
+            <canvas id="entityStatsChart" height="100"></canvas>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h5 class="mb-3">Statuts de Validation</h5>
+            <canvas id="validationChart" height="100"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Tableaux détaillés -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h5 class="mb-3">Performance par Entité</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Entité</th>
+                            <th>Statut</th>
+                            <th>Nombre</th>
+                            <th>Confiance Moy.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in entity_stats %}
+                        <tr>
+                            <td>
+                                <strong>{{ stat.entity_type__name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ stat.validation_status|yesno:'success,warning,danger' }}">
+                                    {{ stat.validation_status|capfirst }}
+                                </span>
+                            </td>
+                            <td>{{ stat.count }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                        {% widthratio stat.avg_confidence 1 100 as confidence_percent %}
+                                        <div class="progress-bar" 
+                                             style="width: {{ confidence_percent }}%"
+                                             role="progressbar"></div>
+                                    </div>
+                                    <small>{{ stat.avg_confidence|floatformat:2 }}</small>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">Aucune donnée disponible</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h5 class="mb-3">Performance des Experts</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Expert</th>
+                            <th>Total</th>
+                            <th>Validées</th>
+                            <th>Rejetées</th>
+                            <th>Taux Validation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expert in expert_stats %}
+                        <tr>
+                            <td>
+                                <i class="fas fa-user-md me-2"></i>
+                                <strong>{{ expert.validated_by__username }}</strong>
+                            </td>
+                            <td>{{ expert.total_validated }}</td>
+                            <td>
+                                <span class="badge bg-success">{{ expert.validated_count }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-danger">{{ expert.rejected_count }}</span>
+                            </td>
+                            <td>
+                                {% widthratio expert.validated_count expert.total_validated 100 as validation_rate %}
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                        <div class="progress-bar bg-success" 
+                                             style="width: {{ validation_rate }}%"
+                                             role="progressbar"></div>
+                                    </div>
+                                    <small>{{ validation_rate }}%</small>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Aucun expert actif</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Métriques de qualité -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <h5 class="mb-3">Métriques de Qualité</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="display-6 text-primary">92%</div>
+                        <small class="text-muted">Précision</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="display-6 text-success">88%</div>
+                        <small class="text-muted">Rappel</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="display-6 text-warning">90%</div>
+                        <small class="text-muted">F1-Score</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="display-6 text-info">0.89</div>
+                        <small class="text-muted">Confiance Globale</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Graphique des entités
+const entityCtx = document.getElementById('entityStatsChart').getContext('2d');
+const entityChart = new Chart(entityCtx, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for stat in entity_stats %}
+                '{{ stat.entity_type__name }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Nombre d\'annotations',
+            data: [
+                {% for stat in entity_stats %}
+                    {{ stat.count }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', 
+                '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Graphique de validation
+const validationCtx = document.getElementById('validationChart').getContext('2d');
+const validationChart = new Chart(validationCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Validées', 'En attente', 'Rejetées'],
+        datasets: [{
+            data: [65, 25, 10], // Valeurs d'exemple
+            backgroundColor: ['#28a745', '#ffc107', '#dc3545']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

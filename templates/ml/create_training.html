@@ -1,0 +1,691 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Créer un Modèle ML{% endblock %}
+{% block page_title %}Créer un Nouveau Modèle d'IA{% endblock %}
+
+{% block extra_css %}
+<style>
+    .training-container {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        margin-bottom: 2rem;
+    }
+    
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+    
+    .step {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        background: #f8f9fa;
+        margin: 0 0.5rem;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .step.active {
+        background: var(--primary-color);
+        color: white;
+    }
+    
+    .step.completed {
+        background: var(--accent-color);
+        color: white;
+    }
+    
+    .step-number {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .step:not(.active) .step-number {
+        background: #dee2e6;
+        color: #6c757d;
+    }
+    
+    .data-preview-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .metric-item {
+        text-align: center;
+        padding: 1rem;
+        border-radius: 8px;
+        background: white;
+        border: 1px solid #dee2e6;
+        margin-bottom: 1rem;
+    }
+    
+    .metric-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        display: block;
+    }
+    
+    .metric-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .parameter-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .parameter-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .algorithm-option {
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .algorithm-option:hover {
+        border-color: var(--primary-color);
+        background-color: #f8f9fa;
+    }
+    
+    .algorithm-option.selected {
+        border-color: var(--primary-color);
+        background-color: var(--primary-color);
+        color: white;
+    }
+    
+    .progress-simulator {
+        background: #e9ecef;
+        border-radius: 10px;
+        height: 20px;
+        overflow: hidden;
+        position: relative;
+        margin: 1rem 0;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+        width: 0%;
+        transition: width 0.5s ease;
+        position: relative;
+    }
+    
+    .progress-fill::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background-image: linear-gradient(
+            -45deg,
+            rgba(255, 255, 255, 0.2) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(255, 255, 255, 0.2) 50%,
+            rgba(255, 255, 255, 0.2) 75%,
+            transparent 75%,
+            transparent
+        );
+        background-size: 50px 50px;
+        animation: move 1s linear infinite;
+    }
+    
+    @keyframes move {
+        0% { background-position: 0 0; }
+        100% { background-position: 50px 50px; }
+    }
+    
+    .help-box {
+        background: #e3f2fd;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .warning-box {
+        background: #fff3cd;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .training-preview {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin: 2rem 0;
+    }
+    
+    .entity-distribution {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .entity-item {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .advanced-toggle {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .advanced-toggle:hover {
+        background: #e9ecef;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- En-tête -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-brain"></i> Créer un Nouveau Modèle d'IA
+                </h2>
+                <a href="{% url 'ml:training_dashboard' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour au dashboard
+                </a>
+            </div>
+
+            <!-- Indicateur d'étapes -->
+            <div class="step-indicator">
+                <div class="step active">
+                    <div class="step-number">1</div>
+                    <span>Configuration</span>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <span>Données</span>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <span>Paramètres</span>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <span>Entraînement</span>
+                </div>
+            </div>
+
+            <form method="post" id="training-form">
+                {% csrf_token %}
+                
+                <!-- Étape 1: Configuration générale -->
+                <div class="training-step active" id="step-1">
+                    <div class="training-container">
+                        <h4 class="mb-3">
+                            <i class="fas fa-cog"></i> Configuration du Modèle
+                        </h4>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Nom du modèle *</label>
+                                    <input type="text" class="form-control" id="name" name="name" 
+                                           placeholder="Ex: Modèle Réglementaire v2.1" required>
+                                    <div class="form-text">Donnez un nom descriptif et unique à votre modèle</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="description" name="description" rows="4" 
+                                              placeholder="Décrivez l'objectif et les spécificités de ce modèle..."></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="data-preview-card">
+                                    <h6><i class="fas fa-database"></i> Données disponibles</h6>
+                                    <div class="metric-item">
+                                        <span class="metric-number" id="total-annotations">{{ total_annotations|default:0 }}</span>
+                                        <div class="metric-label">Annotations validées</div>
+                                    </div>
+                                    <p class="text-muted small">
+                                        Ces annotations serviront à entraîner votre modèle d'IA.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="help-box">
+                            <h6><i class="fas fa-lightbulb"></i> Conseils pour un bon modèle</h6>
+                            <ul class="mb-0">
+                                <li>Utilisez un nom descriptif incluant la version</li>
+                                <li>Documentez l'objectif et les améliorations apportées</li>
+                                <li>Assurez-vous d'avoir au moins 100 annotations par type d'entité</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Étape 2: Analyse des données -->
+                <div class="training-step" id="step-2">
+                    <div class="training-container">
+                        <h4 class="mb-3">
+                            <i class="fas fa-chart-bar"></i> Analyse des Données d'Entraînement
+                        </h4>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="entity-distribution">
+                                    <div class="entity-item">
+                                        <h6>VARIATION_CODE</h6>
+                                        <div class="metric-number">45</div>
+                                        <small class="text-muted">annotations</small>
+                                    </div>
+                                    <div class="entity-item">
+                                        <h6>AUTHORITY</h6>
+                                        <div class="metric-number">32</div>
+                                        <small class="text-muted">annotations</small>
+                                    </div>
+                                    <div class="entity-item">
+                                        <h6>TIMELINE</h6>
+                                        <div class="metric-number">28</div>
+                                        <small class="text-muted">annotations</small>
+                                    </div>
+                                    <div class="entity-item">
+                                        <h6>LEGAL_REF</h6>
+                                        <div class="metric-number">51</div>
+                                        <small class="text-muted">annotations</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="parameter-card">
+                                    <h6>Répartition Train/Validation</h6>
+                                    <div class="mb-3">
+                                        <label for="validation_split" class="form-label">
+                                            Pourcentage validation: <span id="split-value">20%</span>
+                                        </label>
+                                        <input type="range" class="form-range" id="validation_split" 
+                                               name="validation_split" min="10" max="30" value="20" 
+                                               oninput="updateSplitValue(this.value)">
+                                    </div>
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <div class="metric-number text-primary" id="train-count">128</div>
+                                            <div class="metric-label">Entraînement</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="metric-number text-info" id="val-count">32</div>
+                                            <div class="metric-label">Validation</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if total_annotations < 50 %}
+                        <div class="warning-box">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Attention - Données insuffisantes</h6>
+                            <p class="mb-0">
+                                Vous avez actuellement {{ total_annotations }} annotations. Pour un modèle efficace, 
+                                nous recommandons au moins 100 annotations par type d'entité.
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Étape 3: Paramètres du modèle -->
+                <div class="training-step" id="step-3">
+                    <div class="training-container">
+                        <h4 class="mb-3">
+                            <i class="fas fa-sliders-h"></i> Paramètres d'Entraînement
+                        </h4>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Algorithme d'entraînement</h6>
+                                <div class="algorithm-option selected" data-algorithm="bert">
+                                    <i class="fas fa-brain fa-2x mb-2"></i>
+                                    <h6>BERT (Recommandé)</h6>
+                                    <small>Modèle pré-entraîné, haute précision</small>
+                                </div>
+                                <div class="algorithm-option" data-algorithm="lstm">
+                                    <i class="fas fa-project-diagram fa-2x mb-2"></i>
+                                    <h6>LSTM</h6>
+                                    <small>Réseaux récurrents, bon équilibre</small>
+                                </div>
+                                <div class="algorithm-option" data-algorithm="crf">
+                                    <i class="fas fa-sitemap fa-2x mb-2"></i>
+                                    <h6>CRF</h6>
+                                    <small>Rapide, adapté aux petits datasets</small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="parameter-card">
+                                    <h6>Hyperparamètres</h6>
+                                    <div class="mb-3">
+                                        <label for="epochs" class="form-label">Nombre d'époques</label>
+                                        <select class="form-select" id="epochs" name="epochs">
+                                            <option value="10">10 (Rapide)</option>
+                                            <option value="20" selected>20 (Recommandé)</option>
+                                            <option value="50">50 (Précis)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="batch_size" class="form-label">Taille de batch</label>
+                                        <select class="form-select" id="batch_size" name="batch_size">
+                                            <option value="16">16</option>
+                                            <option value="32" selected>32</option>
+                                            <option value="64">64</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="learning_rate" class="form-label">Taux d'apprentissage</label>
+                                        <select class="form-select" id="learning_rate" name="learning_rate">
+                                            <option value="0.001">0.001</option>
+                                            <option value="0.01" selected>0.01</option>
+                                            <option value="0.1">0.1</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="advanced-toggle" onclick="toggleAdvanced()">
+                                    <i class="fas fa-cog"></i> Paramètres avancés
+                                    <i class="fas fa-chevron-down float-end"></i>
+                                </div>
+                                
+                                <div id="advanced-params" style="display: none;">
+                                    <div class="parameter-card">
+                                        <h6>Options avancées</h6>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="early_stopping">
+                                            <label class="form-check-label" for="early_stopping">
+                                                Arrêt anticipé
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="data_augmentation">
+                                            <label class="form-check-label" for="data_augmentation">
+                                                Augmentation de données
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Étape 4: Lancement de l'entraînement -->
+                <div class="training-step" id="step-4">
+                    <div class="training-container">
+                        <h4 class="mb-3">
+                            <i class="fas fa-play-circle"></i> Lancement de l'Entraînement
+                        </h4>
+                        
+                        <div class="training-preview">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5>Récapitulatif</h5>
+                                    <ul class="list-unstyled">
+                                        <li><strong>Modèle:</strong> <span id="summary-name">—</span></li>
+                                        <li><strong>Algorithme:</strong> BERT (Recommandé)</li>
+                                        <li><strong>Données:</strong> {{ total_annotations }} annotations</li>
+                                        <li><strong>Durée estimée:</strong> 15-30 minutes</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <i class="fas fa-rocket fa-4x opacity-75"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="training-progress" style="display: none;">
+                            <h6>Entraînement en cours...</h6>
+                            <div class="progress-simulator">
+                                <div class="progress-fill" id="progress-bar"></div>
+                            </div>
+                            <div class="text-center mt-2">
+                                <span id="progress-text">Initialisation...</span>
+                                <span class="float-end" id="progress-percent">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-secondary" id="prev-btn" onclick="previousStep()" style="display: none;">
+                        <i class="fas fa-arrow-left"></i> Précédent
+                    </button>
+                    <div></div>
+                    <button type="button" class="btn btn-primary" id="next-btn" onclick="nextStep()">
+                        Suivant <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button type="submit" class="btn btn-success" id="submit-btn" style="display: none;">
+                        <i class="fas fa-play"></i> Démarrer l'entraînement
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStep = 1;
+const totalSteps = 4;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser l'affichage
+    showStep(1);
+    updateNavigation();
+    
+    // Gestion des algorithmes
+    document.querySelectorAll('.algorithm-option').forEach(option => {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.algorithm-option').forEach(opt => opt.classList.remove('selected'));
+            this.classList.add('selected');
+        });
+    });
+    
+    // Mise à jour du résumé en temps réel
+    document.getElementById('name').addEventListener('input', function() {
+        document.getElementById('summary-name').textContent = this.value || '—';
+    });
+});
+
+function nextStep() {
+    if (currentStep < totalSteps) {
+        // Valider l'étape actuelle
+        if (!validateCurrentStep()) {
+            return;
+        }
+        
+        currentStep++;
+        showStep(currentStep);
+        updateStepIndicator();
+        updateNavigation();
+    }
+}
+
+function previousStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+        updateStepIndicator();
+        updateNavigation();
+    }
+}
+
+function showStep(stepNumber) {
+    document.querySelectorAll('.training-step').forEach(step => {
+        step.style.display = 'none';
+    });
+    document.getElementById(`step-${stepNumber}`).style.display = 'block';
+}
+
+function updateStepIndicator() {
+    document.querySelectorAll('.step').forEach((step, index) => {
+        step.classList.remove('active', 'completed');
+        if (index + 1 < currentStep) {
+            step.classList.add('completed');
+        } else if (index + 1 === currentStep) {
+            step.classList.add('active');
+        }
+    });
+}
+
+function updateNavigation() {
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    prevBtn.style.display = currentStep > 1 ? 'block' : 'none';
+    
+    if (currentStep === totalSteps) {
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'block';
+    } else {
+        nextBtn.style.display = 'block';
+        submitBtn.style.display = 'none';
+    }
+}
+
+function validateCurrentStep() {
+    switch(currentStep) {
+        case 1:
+            const name = document.getElementById('name').value.trim();
+            if (!name) {
+                alert('Veuillez saisir un nom pour le modèle');
+                return false;
+            }
+            return true;
+        case 2:
+        case 3:
+        case 4:
+            return true;
+        default:
+            return true;
+    }
+}
+
+function updateSplitValue(value) {
+    document.getElementById('split-value').textContent = value + '%';
+    
+    const totalAnnotations = {{ total_annotations|default:0 }};
+    const valCount = Math.round(totalAnnotations * value / 100);
+    const trainCount = totalAnnotations - valCount;
+    
+    document.getElementById('train-count').textContent = trainCount;
+    document.getElementById('val-count').textContent = valCount;
+}
+
+function toggleAdvanced() {
+    const advanced = document.getElementById('advanced-params');
+    const icon = document.querySelector('.advanced-toggle .fa-chevron-down');
+    
+    if (advanced.style.display === 'none') {
+        advanced.style.display = 'block';
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+    } else {
+        advanced.style.display = 'none';
+        icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+    }
+}
+
+// Simuler l'entraînement lors de la soumission
+document.getElementById('training-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    startTrainingSimulation();
+});
+
+function startTrainingSimulation() {
+    document.getElementById('training-progress').style.display = 'block';
+    document.getElementById('submit-btn').disabled = true;
+    
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressPercent = document.getElementById('progress-percent');
+    
+    const steps = [
+        'Préparation des données...',
+        'Initialisation du modèle...',
+        'Entraînement en cours...',
+        'Validation...',
+        'Finalisation...'
+    ];
+    
+    let progress = 0;
+    let stepIndex = 0;
+    
+    const interval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            setTimeout(() => {
+                // Soumettre le formulaire réel
+                document.getElementById('training-form').submit();
+            }, 1000);
+        }
+        
+        // Mettre à jour l'étape
+        if (stepIndex < steps.length - 1 && progress > (stepIndex + 1) * 20) {
+            stepIndex++;
+        }
+        
+        progressBar.style.width = progress + '%';
+        progressText.textContent = steps[stepIndex];
+        progressPercent.textContent = Math.round(progress) + '%';
+    }, 500);
+}
+</script>
+{% endblock %}

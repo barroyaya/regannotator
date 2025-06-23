@@ -1,0 +1,262 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Déployer le modèle - {{ model.version }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .deployment-card {
+        border-left: 4px solid #28a745;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+    .warning-card {
+        border-left: 4px solid #ffc107;
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    }
+    .model-info {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .deployment-icon {
+        font-size: 3rem;
+        color: #28a745;
+        margin-bottom: 1rem;
+    }
+    .warning-icon {
+        font-size: 2rem;
+        color: #ffc107;
+    }
+    .btn-deploy {
+        background: linear-gradient(45deg, #28a745, #20c997);
+        border: none;
+        padding: 12px 30px;
+        font-weight: bold;
+        box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+        transition: all 0.3s ease;
+    }
+    .btn-deploy:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(40, 167, 69, 0.4);
+    }
+    .metric-badge {
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-weight: bold;
+        margin: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- En-tête -->
+            <div class="text-center mb-4">
+                <i class="fas fa-rocket deployment-icon"></i>
+                <h1 class="h3 mb-2">Déployer le modèle</h1>
+                <p class="text-muted">Vous êtes sur le point de déployer ce modèle en production</p>
+            </div>
+
+            <!-- Avertissement -->
+            <div class="card warning-card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle warning-icon mr-3"></i>
+                        <div>
+                            <h6 class="mb-1">Important</h6>
+                            <p class="mb-0">
+                                Le déploiement de ce modèle désactivera automatiquement tous les autres modèles actifs.
+                                Cette action affectera immédiatement les prédictions en production.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informations du modèle -->
+            <div class="card model-info mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-brain"></i>
+                        Informations du modèle
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-5">Version:</dt>
+                                <dd class="col-sm-7">
+                                    <span class="badge badge-info">{{ model.version }}</span>
+                                </dd>
+                                
+                                <dt class="col-sm-5">Entraînement:</dt>
+                                <dd class="col-sm-7">{{ model.training.name }}</dd>
+                                
+                                <dt class="col-sm-5">Créé le:</dt>
+                                <dd class="col-sm-7">{{ model.created_at|date:"d/m/Y H:i" }}</dd>
+                                
+                                <dt class="col-sm-5">Statut actuel:</dt>
+                                <dd class="col-sm-7">
+                                    {% if model.is_active %}
+                                        <span class="badge badge-success">Actif</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inactif</span>
+                                    {% endif %}
+                                </dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-5">Algorithme:</dt>
+                                <dd class="col-sm-7">{{ model.training.model_parameters.algorithm|default:"N/A" }}</dd>
+                                
+                                <dt class="col-sm-5">Taille du modèle:</dt>
+                                <dd class="col-sm-7">{{ model.model_size|default:"N/A" }}</dd>
+                                
+                                <dt class="col-sm-5">Créé par:</dt>
+                                <dd class="col-sm-7">{{ model.training.created_by.username }}</dd>
+                                
+                                <dt class="col-sm-5">Description:</dt>
+                                <dd class="col-sm-7">{{ model.training.description|default:"Aucune description" }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Métriques de performance -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-line"></i>
+                        Métriques de performance
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <span class="metric-badge bg-primary text-white">
+                            Précision: {{ model.training.accuracy_score|floatformat:3 }}
+                        </span>
+                        <span class="metric-badge bg-success text-white">
+                            Précision: {{ model.training.precision_score|floatformat:3 }}
+                        </span>
+                        <span class="metric-badge bg-info text-white">
+                            Rappel: {{ model.training.recall_score|floatformat:3 }}
+                        </span>
+                        <span class="metric-badge bg-warning text-white">
+                            F1: {{ model.training.f1_score|floatformat:3 }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paramètres du modèle -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-cogs"></i>
+                        Paramètres d'entraînement
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><strong>Époques:</strong> {{ model.training.model_parameters.epochs|default:"N/A" }}</li>
+                                <li><strong>Taille de batch:</strong> {{ model.training.model_parameters.batch_size|default:"N/A" }}</li>
+                                <li><strong>Taux d'apprentissage:</strong> {{ model.training.model_parameters.learning_rate|default:"N/A" }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><strong>Arrêt précoce:</strong> 
+                                    {% if model.training.model_parameters.early_stopping %}
+                                        <span class="badge badge-success">Oui</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Non</span>
+                                    {% endif %}
+                                </li>
+                                <li><strong>Augmentation des données:</strong> 
+                                    {% if model.training.model_parameters.data_augmentation %}
+                                        <span class="badge badge-success">Oui</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Non</span>
+                                    {% endif %}
+                                </li>
+                                <li><strong>Division validation:</strong> {{ model.training.validation_split|floatformat:1 }}%</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card deployment-card">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Confirmer le déploiement</h6>
+                    <p class="card-text mb-4">
+                        Êtes-vous sûr de vouloir déployer ce modèle en production ?
+                    </p>
+                    
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-deploy text-white">
+                            <i class="fas fa-rocket mr-2"></i>
+                            Déployer en production
+                        </button>
+                    </form>
+                    
+                    <a href="{% url 'ml:model_detail' model.id %}" class="btn btn-outline-secondary ml-3">
+                        <i class="fas fa-times mr-2"></i>
+                        Annuler
+                    </a>
+                </div>
+            </div>
+
+            <!-- Informations additionnelles -->
+            <div class="alert alert-info mt-4" role="alert">
+                <h6 class="alert-heading">
+                    <i class="fas fa-info-circle"></i>
+                    Que se passe-t-il après le déploiement ?
+                </h6>
+                <ul class="mb-0">
+                    <li>Le modèle sera marqué comme actif</li>
+                    <li>Tous les autres modèles seront automatiquement désactivés</li>
+                    <li>Les nouvelles prédictions utiliseront ce modèle</li>
+                    <li>Un log de déploiement sera créé</li>
+                    <li>Les équipes seront notifiées du changement</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Confirmation avant déploiement
+document.querySelector('form').addEventListener('submit', function(e) {
+    if (!confirm('Êtes-vous absolument certain de vouloir déployer ce modèle en production ? Cette action est irréversible.')) {
+        e.preventDefault();
+    }
+});
+
+// Animation des métriques
+document.addEventListener('DOMContentLoaded', function() {
+    const badges = document.querySelectorAll('.metric-badge');
+    badges.forEach((badge, index) => {
+        setTimeout(() => {
+            badge.style.opacity = '0';
+            badge.style.transform = 'translateY(20px)';
+            badge.offsetHeight; // Force reflow
+            badge.style.transition = 'all 0.5s ease';
+            badge.style.opacity = '1';
+            badge.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+});
+</script>
+{% endblock %}

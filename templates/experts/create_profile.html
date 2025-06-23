@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block title %}Créer un Expert - RegAnnotator{% endblock %}
+{% block page_title %}Nouveau Profil Expert{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h5 class="mb-4">Créer un Profil Expert</h5>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Utilisateur <span class="text-danger">*</span></label>
+                            <select class="form-select" name="user_id" required id="user-select">
+                                <option value="">Choisir un utilisateur...</option>
+                                {% for user in users %}
+                                    <option value="{{ user.id }}" data-email="{{ user.email }}">
+                                        {{ user.get_full_name|default:user.username }} ({{ user.email }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Seuls les utilisateurs sans profil expert sont affichés</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Niveau d'expertise <span class="text-danger">*</span></label>
+                            <select class="form-select" name="expertise_level" required>
+                                <option value="">Choisir...</option>
+                                {% for value, label in expertise_levels %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Années d'expérience</label>
+                            <input type="number" class="form-control" name="years_experience" 
+                                   min="0" max="50" value="0">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Vitesse d'annotation</label>
+                            <select class="form-select" name="annotation_speed">
+                                <option value="normal">Normal</option>
+                                <option value="slow">Minutieux</option>
+                                <option value="fast">Rapide</option>
+                            </select>
+                            <div class="form-text">Préférence de rythme de travail</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Entreprise</label>
+                            <input type="text" class="form-control" name="company" 
+                                   placeholder="ex: Sanofi, Novartis, Indépendant...">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Poste</label>
+                            <input type="text" class="form-control" name="position" 
+                                   placeholder="ex: Responsable Affaires Réglementaires...">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Spécialisations</label>
+                            <div class="row">
+                                {% for value, label in specializations %}
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" 
+                                                   name="specializations" value="{{ value }}" id="spec_{{ value }}">
+                                            <label class="form-check-label" for="spec_{{ value }}">
+                                                {{ label }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Certifications (optionnel)</label>
+                    <textarea class="form-control" name="certifications" rows="3" 
+                              placeholder="Listez les certifications, formations ou qualifications pertinentes..."></textarea>
+                </div>
+                
+                <!-- Aperçu utilisateur sélectionné -->
+                <div class="alert alert-info" id="user-preview" style="display: none;">
+                    <h6><i class="fas fa-user"></i> Aperçu du Profil</h6>
+                    <div id="user-info"></div>
+                </div>
+                
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'experts:expert_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Annuler
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-user-plus"></i> Créer le Profil Expert
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Guide des niveaux d'expertise -->
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h6 class="mb-3">Guide des Niveaux d'Expertise</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-warning">👶 Junior (< 2 ans)</h6>
+                    <ul class="small">
+                        <li>Nouvelle dans le domaine réglementaire</li>
+                        <li>Nécessite supervision</li>
+                        <li>Annotations simples</li>
+                    </ul>
+                    
+                    <h6 class="text-info">👨‍💼 Confirmé (2-5 ans)</h6>
+                    <ul class="small">
+                        <li>Expérience solide</li>
+                        <li>Travail autonome</li>
+                        <li>Peut former les juniors</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-success">🎓 Senior (5-10 ans)</h6>
+                    <ul class="small">
+                        <li>Expertise avancée</li>
+                        <li>Peut gérer des projets complexes</li>
+                        <li>Référent technique</li>
+                    </ul>
+                    
+                    <h6 class="text-danger">🏆 Expert (> 10 ans)</h6>
+                    <ul class="small">
+                        <li>Autorité reconnue</li>
+                        <li>Peut définir les standards</li>
+                        <li>Formation et validation finale</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Aperçu de l'utilisateur sélectionné
+document.getElementById('user-select').addEventListener('change', function() {
+    const selectedOption = this.selectedOptions[0];
+    const preview = document.getElementById('user-preview');
+    const userInfo = document.getElementById('user-info');
+    
+    if (selectedOption.value) {
+        const userName = selectedOption.textContent.split(' (')[0];
+        const userEmail = selectedOption.getAttribute('data-email');
+        
+        userInfo.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Nom:</strong> ${userName}<br>
+                    <strong>Email:</strong> ${userEmail}
+                </div>
+                <div class="col-md-6">
+                    <strong>ID:</strong> ${selectedOption.value}<br>
+                    <strong>Statut:</strong> <span class="badge bg-success">Disponible</span>
+                </div>
+            </div>
+        `;
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+});
+
+// Validation du formulaire
+document.querySelector('form').addEventListener('submit', function(e) {
+    const userSelect = document.getElementById('user-select');
+    const expertiseLevel = document.querySelector('select[name="expertise_level"]');
+    
+    if (!userSelect.value) {
+        e.preventDefault();
+        alert('Veuillez sélectionner un utilisateur.');
+        userSelect.focus();
+        return;
+    }
+    
+    if (!expertiseLevel.value) {
+        e.preventDefault();
+        alert('Veuillez sélectionner un niveau d\'expertise.');
+        expertiseLevel.focus();
+        return;
+    }
+});
+
+// Auto-complétion intelligente
+document.querySelector('input[name="years_experience"]').addEventListener('change', function() {
+    const years = parseInt(this.value);
+    const expertiseSelect = document.querySelector('select[name="expertise_level"]');
+    
+    if (!expertiseSelect.value) {
+        if (years < 2) {
+            expertiseSelect.value = 'junior';
+        } else if (years < 5) {
+            expertiseSelect.value = 'confirmed';
+        } else if (years < 10) {
+            expertiseSelect.value = 'senior';
+        } else {
+            expertiseSelect.value = 'expert';
+        }
+    }
+});
+</script>
+{% endblock %}

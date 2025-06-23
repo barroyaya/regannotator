@@ -1,0 +1,631 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Règles Expertes ML{% endblock %}
+{% block page_title %}Gestion des Règles Expertes{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rules-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        margin-bottom: 2rem;
+    }
+    
+    .rule-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+        border-left: 4px solid #dee2e6;
+        position: relative;
+    }
+    
+    .rule-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+    
+    .rule-card.active {
+        border-left-color: var(--accent-color);
+    }
+    
+    .rule-card.inactive {
+        border-left-color: #dc3545;
+        background-color: #faf9f9;
+    }
+    
+    .rule-type-pattern { border-left-color: #007bff; }
+    .rule-type-keyword { border-left-color: #28a745; }
+    .rule-type-context { border-left-color: #ffc107; }
+    .rule-type-position { border-left-color: #17a2b8; }
+    
+    .rule-status {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .status-active { 
+        background-color: #d4edda; 
+        color: #155724;
+    }
+    .status-inactive { 
+        background-color: #f8d7da; 
+        color: #721c24;
+    }
+    
+    .rule-type-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .type-pattern { background-color: #e3f2fd; color: #1976d2; }
+    .type-keyword { background-color: #e8f5e8; color: #388e3c; }
+    .type-context { background-color: #fff3e0; color: #f57c00; }
+    .type-position { background-color: #e0f2f1; color: #00796b; }
+    
+    .entity-badge {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .confidence-meter {
+        height: 6px;
+        background-color: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 0.5rem 0;
+    }
+    
+    .confidence-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+    
+    .confidence-high { background: linear-gradient(90deg, #28a745, #20c997); }
+    .confidence-medium { background: linear-gradient(90deg, #ffc107, #fd7e14); }
+    .confidence-low { background: linear-gradient(90deg, #dc3545, #e83e8c); }
+    
+    .pattern-preview {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        word-break: break-all;
+    }
+    
+    .stats-mini {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .usage-stats {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .rule-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-item {
+        text-align: center;
+        background: rgba(255,255,255,0.2);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        display: block;
+    }
+    
+    .test-rule-modal .modal-dialog {
+        max-width: 600px;
+    }
+    
+    .test-result {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .match-highlight {
+        background-color: #fff3cd;
+        padding: 2px 4px;
+        border-radius: 3px;
+        border: 1px solid #ffeaa7;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête spécialisé -->
+    <div class="rules-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-2">
+                    <i class="fas fa-ruler"></i> Règles Expertes
+                </h2>
+                <p class="mb-0">
+                    Gérez les règles métier pour l'extraction automatique d'entités réglementaires
+                </p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="quick-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ page_obj.paginator.count|default:0 }}</span>
+                        <small>Total Règles</small>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{% for rule in page_obj %}{% if rule.is_active %}{{ forloop.counter0|add:1 }}{% endif %}{% empty %}0{% endfor %}</span>
+                        <small>Actives</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions rapides -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="btn-group">
+            <a href="{% url 'ml:create_rule' %}" class="btn btn-success">
+                <i class="fas fa-plus"></i> Nouvelle règle
+            </a>
+            <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#testRuleModal">
+                <i class="fas fa-flask"></i> Tester une règle
+            </button>
+        </div>
+        <div class="btn-group">
+            <a href="{% url 'ml:training_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-tachometer-alt"></i> Dashboard ML
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="filter-card">
+        <form method="get" class="row align-items-end">
+            <div class="col-md-2">
+                <label for="entity" class="form-label">Entité</label>
+                <select name="entity" id="entity" class="form-select">
+                    <option value="">Toutes les entités</option>
+                    {% for entity in entities %}
+                        <option value="{{ entity.id }}" {% if current_filters.entity == entity.id|stringformat:"s" %}selected{% endif %}>
+                            {{ entity.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-2">
+                <label for="rule_type" class="form-label">Type de règle</label>
+                <select name="rule_type" id="rule_type" class="form-select">
+                    <option value="">Tous les types</option>
+                    {% for type_code, type_name in rule_types %}
+                        <option value="{{ type_code }}" {% if current_filters.rule_type == type_code %}selected{% endif %}>
+                            {{ type_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-2">
+                <label for="is_active" class="form-label">Statut</label>
+                <select name="is_active" id="is_active" class="form-select">
+                    <option value="">Tous</option>
+                    <option value="true" {% if current_filters.is_active == 'true' %}selected{% endif %}>Actives</option>
+                    <option value="false" {% if current_filters.is_active == 'false' %}selected{% endif %}>Inactives</option>
+                </select>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="search" class="form-label">Rechercher</label>
+                <input type="text" name="search" id="search" class="form-control" 
+                       placeholder="Nom ou pattern..." value="{{ request.GET.search }}">
+            </div>
+            
+            <div class="col-md-3">
+                <div class="btn-group w-100">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Filtrer
+                    </button>
+                    <a href="{% url 'ml:expert_rules' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Reset
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Liste des règles -->
+    {% if page_obj %}
+        <div class="rules-list">
+            {% for rule in page_obj %}
+            <div class="rule-card rule-type-{{ rule.rule_type }} {% if rule.is_active %}active{% else %}inactive{% endif %}">
+                <div class="rule-status status-{% if rule.is_active %}active{% else %}inactive{% endif %}">
+                    {% if rule.is_active %}
+                        <i class="fas fa-check-circle"></i> Active
+                    {% else %}
+                        <i class="fas fa-pause-circle"></i> Inactive
+                    {% endif %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="d-flex align-items-center mb-2">
+                            <h5 class="mb-0">
+                                <a href="{% url 'ml:rule_detail' rule.id %}" class="text-decoration-none">
+                                    {{ rule.name }}
+                                </a>
+                            </h5>
+                            <span class="rule-type-badge type-{{ rule.rule_type }} ms-2">
+                                {{ rule.get_rule_type_display }}
+                            </span>
+                            <span class="entity-badge ms-2">{{ rule.entity_type.name }}</span>
+                        </div>
+                        
+                        <div class="pattern-preview">
+                            <strong>Pattern:</strong> {{ rule.pattern|truncatechars:80 }}
+                        </div>
+                        
+                        <div class="d-flex align-items-center mt-2">
+                            <span class="me-2">Confiance: {{ rule.confidence_score|floatformat:1 }}</span>
+                            <div class="confidence-meter flex-grow-1">
+                                <div class="confidence-fill 
+                                    {% if rule.confidence_score >= 0.8 %}confidence-high
+                                    {% elif rule.confidence_score >= 0.5 %}confidence-medium
+                                    {% else %}confidence-low{% endif %}"
+                                    style="width: {{ rule.confidence_score|floatformat:0 }}%;"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="stats-mini">
+                            <div class="usage-stats">
+                                <span class="text-muted">
+                                    <i class="fas fa-chart-bar"></i> {{ rule.usage_count }} utilisations
+                                </span>
+                                <span class="text-success">
+                                    <i class="fas fa-percentage"></i> {{ rule.success_rate|floatformat:1 }}% succès
+                                </span>
+                            </div>
+                            <small class="text-muted">
+                                Créée le {{ rule.created_at|date:"d/m/Y" }}
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="rule-actions">
+                            <a href="{% url 'ml:rule_detail' rule.id %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye"></i> Détails
+                            </a>
+                            
+                            <a href="{% url 'ml:edit_rule' rule.id %}" class="btn btn-outline-warning btn-sm">
+                                <i class="fas fa-edit"></i> Modifier
+                            </a>
+                            
+                            <button class="btn btn-outline-info btn-sm" 
+                                    onclick="testRule('{{ rule.pattern|escapejs }}', '{{ rule.rule_type }}', '{{ rule.name|escapejs }}')">
+                                <i class="fas fa-flask"></i> Tester
+                            </button>
+                            
+                            {% if rule.is_active %}
+                            <form method="post" action="{% url 'ml:edit_rule' rule.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="toggle_status" value="inactive">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-pause"></i> Désactiver
+                                </button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="{% url 'ml:edit_rule' rule.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="toggle_status" value="active">
+                                <button type="submit" class="btn btn-outline-success btn-sm">
+                                    <i class="fas fa-play"></i> Activer
+                                </button>
+                            </form>
+                            {% endif %}
+                            
+                            <a href="{% url 'ml:delete_rule' rule.id %}" class="btn btn-outline-danger btn-sm"
+                               onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette règle ?')">
+                                <i class="fas fa-trash"></i> Supprimer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-5">
+                <i class="fas fa-ruler fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">Aucune règle trouvée</h5>
+                <p class="text-muted">
+                    {% if current_filters.entity or current_filters.rule_type or current_filters.is_active %}
+                        Aucune règle ne correspond aux critères de filtrage.
+                    {% else %}
+                        Créez votre première règle experte pour améliorer la précision du système.
+                    {% endif %}
+                </p>
+                <div class="mt-3">
+                    {% if current_filters.entity or current_filters.rule_type or current_filters.is_active %}
+                        <a href="{% url 'ml:expert_rules' %}" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-times"></i> Supprimer filtres
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'ml:create_rule' %}" class="btn btn-success">
+                        <i class="fas fa-plus"></i> Créer première règle
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="d-flex justify-content-center mt-4">
+            <nav aria-label="Navigation des règles">
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<!-- Modal de test de règle -->
+<div class="modal fade" id="testRuleModal" tabindex="-1">
+    <div class="modal-dialog test-rule-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-flask"></i> Tester une Règle
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="test-rule-form">
+                    <div class="mb-3">
+                        <label for="test-pattern" class="form-label">Pattern à tester</label>
+                        <input type="text" class="form-control" id="test-pattern" 
+                               placeholder="Ex: Article \\d+\\.\\d+-\\d+" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="test-rule-type" class="form-label">Type de règle</label>
+                        <select class="form-select" id="test-rule-type" required>
+                            {% for type_code, type_name in rule_types %}
+                                <option value="{{ type_code }}">{{ type_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="test-text" class="form-label">Texte de test</label>
+                        <textarea class="form-control" id="test-text" rows="4" 
+                                  placeholder="Saisissez le texte sur lequel tester la règle..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Tester la règle
+                    </button>
+                </form>
+                
+                <div id="test-results" style="display: none;">
+                    <hr>
+                    <h6>Résultats du test</h6>
+                    <div class="test-result" id="test-output"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animation des barres de confiance
+    setTimeout(() => {
+        document.querySelectorAll('.confidence-fill').forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+            }, 200);
+        });
+    }, 300);
+});
+
+// Fonction pour pré-remplir le modal de test avec une règle existante
+function testRule(pattern, ruleType, ruleName) {
+    document.getElementById('test-pattern').value = pattern;
+    document.getElementById('test-rule-type').value = ruleType;
+    
+    const modal = new bootstrap.Modal(document.getElementById('testRuleModal'));
+    modal.show();
+}
+
+// Gestionnaire du formulaire de test
+document.getElementById('test-rule-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const pattern = document.getElementById('test-pattern').value;
+    const ruleType = document.getElementById('test-rule-type').value;
+    const testText = document.getElementById('test-text').value;
+    
+    // Appel API pour tester la règle
+    fetch('{% url "ml:api_test_rule" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({
+            pattern: pattern,
+            rule_type: ruleType,
+            test_text: testText
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayTestResults(data, testText);
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        displayTestResults({error: 'Erreur lors du test de la règle'}, testText);
+    });
+});
+
+function displayTestResults(data, originalText) {
+    const resultsDiv = document.getElementById('test-results');
+    const outputDiv = document.getElementById('test-output');
+    
+    if (data.error) {
+        outputDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> ${data.error}
+            </div>
+        `;
+    } else {
+        let highlightedText = originalText;
+        
+        if (data.matches && data.matches.length > 0) {
+            // Highlighted matches in the text
+            data.matches.forEach(match => {
+                const before = highlightedText.substring(0, match.start_position);
+                const matchText = highlightedText.substring(match.start_position, match.end_position);
+                const after = highlightedText.substring(match.end_position);
+                
+                highlightedText = before + `<span class="match-highlight">${matchText}</span>` + after;
+            });
+            
+            outputDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> ${data.match_count} correspondance(s) trouvée(s)
+                </div>
+                <h6>Texte avec correspondances en surbrillance:</h6>
+                <div class="border p-2 mb-3" style="white-space: pre-wrap;">${highlightedText}</div>
+                <h6>Détails des correspondances:</h6>
+                <ul class="list-group">
+                    ${data.matches.map(match => `
+                        <li class="list-group-item">
+                            <strong>"${match.text_value}"</strong> 
+                            (positions ${match.start_position}-${match.end_position}, 
+                            confiance: ${match.confidence_score})
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        } else {
+            outputDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle"></i> Aucune correspondance trouvée
+                </div>
+                <p>Le pattern ne correspond à aucun élément dans le texte de test.</p>
+            `;
+        }
+    }
+    
+    resultsDiv.style.display = 'block';
+}
+
+// Fonction utilitaire pour récupérer le token CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

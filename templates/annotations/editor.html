@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+
+{% block title %}Éditeur d'Annotations - RegAnnotator{% endblock %}
+{% block page_title %}Éditeur d'Annotations{% endblock %}
+
+{% block content %}
+<!-- En-tête avec informations de la phrase -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h5>Document : {{ sentence.document.title|truncatechars:60 }}</h5>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-file-pdf"></i> {{ sentence.document.source.acronym }}
+                        <span class="mx-2">•</span>
+                        <i class="fas fa-paragraph"></i> Phrase {{ sentence.sentence_number }}
+                        {% if sentence.page_number %}
+                            <span class="mx-2">•</span>
+                            <i class="fas fa-file-alt"></i> Page {{ sentence.page_number }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <a href="{% url 'dashboard:document_detail' sentence.document.id %}" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i> Retour au Document
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Texte de la phrase -->
+            <div class="sentence-display" id="sentence-text" data-sentence-id="{{ sentence.id }}">
+                {{ sentence.text }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h6 class="mb-3">Actions Rapides</h6>
+            <div class="d-grid gap-2">
+                <button class="btn btn-success" onclick="validateAllPending()">
+                    <i class="fas fa-check-double"></i> Valider Tout
+                </button>
+                <button class="btn btn-danger" onclick="rejectAllPending()">
+                    <i class="fas fa-times-circle"></i> Rejeter Tout
+                </button>
+                <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#newAnnotationModal">
+                    <i class="fas fa-plus"></i> Nouvelle Annotation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Légende des entités -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <h6 class="mb-3">Types d'Entités Disponibles</h6>
+            <div class="row">
+                {% for entity in entity_types %}
+                    <div class="col-md-3 mb-2">
+                        <div class="d-flex align-items-center">
+                            <div class="me-2" style="width: 16px; height: 16px; background-color: {{ entity.color }}; border-radius: 3px;"></div>
+                            <small><strong>{{ entity.name }}</strong></small>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des annotations -->
+<div class="stat-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Annotations Détectées ({{ annotations.count }})</h5>
+        <div>
+            <button class="btn btn-sm btn-outline-success" onclick="showAllAnnotations()">
+                <i class="fas fa-eye"></i> Tout Afficher
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="hideAllAnnotations()">
+                <i class="fas fa-eye-slash"></i> Masquer
+            </button>
+        </div>
+    </div>
+    
+    {% if annotations %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Entité</th>
+                        <th>Valeur</th>
+                        <th>Position</th>
+                        <th>Confiance</th>
+                        <th>Source</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for annotation in annotations %}
+                    <tr id="annotation-{{ annotation.id }}" class="annotation-row">
+                        <td>
+                            <span class="badge" style="background-color: {{ annotation.entity_type.color }};">
+                                {{ annotation.entity_type.name }}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>"{{ annotation.text_value }}"</strong>
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ annotation.start_position }}-{{ annotation.end_position }}</small>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                    <div class="progress-bar 
+                                        {% if annotation.confidence_score >= 0.8 %}bg-success
+                                        {% elif annotation.confidence_score >= 0.5 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" 
+                                         style="width: {{ annotation.confidence_score|mul:100 }}%"></div>
+                                </div>
+                                <small>{{ annotation.confidence_score|floatformat:2 }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ annotation.source|yesno:'info,success,warning' }}">
+                                {{ annotation.get_source_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ annotation.validation_status|yesno:'success,warning,danger' }}">
+                                {{ annotation.get_validation_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                {% if annotation.validation_status == 'pending' %}
+                                    <form method="post" style="display: inline;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="annotation_id" value="{{ annotation.id }}">
+                                        <input type="hidden" name="action" value="validate">
+                                        <button type="submit" class="btn btn-success" title="Valider">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" style="display: inline;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="annotation_id" value="{{ annotation.id }}">
+                                        <input type="hidden" name="action" value="reject">
+                                        <button type="submit" class="btn btn-danger" title="Rejeter">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <a href="{% url 'annotations:edit_annotation' annotation.id %}" 
+                                   class="btn btn-outline-primary" title="Éditer">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'annotations:add_feedback' annotation.id %}" 
+                                   class="btn btn-outline-info" title="Feedback">
+                                    <i class="fas fa-comment"></i>
+                                </a>
+                                <a href="{% url 'annotations:delete_annotation' annotation.id %}" 
+                                   class="btn btn-outline-danger" title="Supprimer">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+            <h6 class="text-muted">Aucune annotation trouvée</h6>
+            <p class="text-muted">Cette phrase n'a pas encore été annotée automatiquement.</p>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newAnnotationModal">
+                <i class="fas fa-plus"></i> Créer une Annotation
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal nouvelle annotation -->
+<div class="modal fade" id="newAnnotationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouvelle Annotation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'annotations:create_annotation' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="sentence_id" value="{{ sentence.id }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Texte à annoter</label>
+                        <input type="text" class="form-control" name="text_value" required 
+                               placeholder="Sélectionnez le texte dans la phrase">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Type d'entité</label>
+                        <select class="form-select" name="entity_type_id" required>
+                            <option value="">Choisir...</option>
+                            {% for entity in entity_types %}
+                                <option value="{{ entity.id }}">{{ entity.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Position début</label>
+                            <input type="number" class="form-control" name="start_position" min="0" value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Position fin</label>
+                            <input type="number" class="form-control" name="end_position" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Créer l'Annotation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Fonctions pour actions rapides
+function validateAllPending() {
+    const forms = document.querySelectorAll('input[value="validate"]');
+    if (confirm(`Valider toutes les annotations en attente (${forms.length}) ?`)) {
+        forms.forEach(input => input.closest('form').submit());
+    }
+}
+
+function rejectAllPending() {
+    const forms = document.querySelectorAll('input[value="reject"]');
+    if (confirm(`Rejeter toutes les annotations en attente (${forms.length}) ?`)) {
+        forms.forEach(input => input.closest('form').submit());
+    }
+}
+
+function showAllAnnotations() {
+    document.querySelectorAll('.annotation-row').forEach(row => {
+        row.style.display = 'table-row';
+    });
+}
+
+function hideAllAnnotations() {
+    document.querySelectorAll('.annotation-row').forEach(row => {
+        if (row.querySelector('.badge').textContent.trim() === 'En attente') {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Sélection de texte pour nouvelle annotation
+document.addEventListener('mouseup', function() {
+    const selection = window.getSelection();
+    if (selection.toString().length > 0) {
+        const selectedText = selection.toString().trim();
+        const textInput = document.querySelector('input[name="text_value"]');
+        if (textInput) {
+            textInput.value = selectedText;
+            
+            // Calculer les positions approximatives
+            const sentenceText = document.getElementById('sentence-text').textContent;
+            const startPos = sentenceText.indexOf(selectedText);
+            if (startPos !== -1) {
+                document.querySelector('input[name="start_position"]').value = startPos;
+                document.querySelector('input[name="end_position"]').value = startPos + selectedText.length;
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

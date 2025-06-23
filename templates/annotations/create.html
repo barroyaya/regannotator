@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block title %}Créer une Annotation - RegAnnotator{% endblock %}
+{% block page_title %}Nouvelle Annotation{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h5 class="mb-4">Créer une Annotation Manuelle</h5>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Phrase à annoter <span class="text-danger">*</span></label>
+                            <select class="form-select" name="sentence_id" required id="sentence-select">
+                                <option value="">Choisir une phrase...</option>
+                                {% for sentence in sentences %}
+                                    <option value="{{ sentence.id }}" data-text="{{ sentence.text }}">
+                                        {{ sentence.document.title|truncatechars:30 }} - Phrase {{ sentence.sentence_number }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Type d'entité <span class="text-danger">*</span></label>
+                            <select class="form-select" name="entity_type_id" required>
+                                <option value="">Choisir...</option>
+                                {% for entity in entity_types %}
+                                    <option value="{{ entity.id }}" style="color: {{ entity.color }};">
+                                        {{ entity.name }} - {{ entity.description }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Texte de l'entité <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="text_value" required
+                                   placeholder="ex: Type IB, EMA, Article 61...">
+                            <div class="form-text">Le texte exact à extraire de la phrase</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Aperçu de la phrase</label>
+                            <div class="form-control" style="height: 120px; overflow-y: auto;" id="sentence-preview">
+                                <em class="text-muted">Sélectionnez une phrase pour voir son contenu...</em>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Position début</label>
+                                    <input type="number" class="form-control" name="start_position" min="0" value="0">
+                                    <div class="form-text">Position du premier caractère</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Position fin</label>
+                                    <input type="number" class="form-control" name="end_position" min="0" value="0">
+                                    <div class="form-text">Position du dernier caractère</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-lightbulb"></i>
+                            <strong>Astuce :</strong> Copiez le texte exact depuis l'aperçu pour éviter les erreurs de position.
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'dashboard:home' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Annuler
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Créer l'Annotation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Guide d'utilisation -->
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h6 class="mb-3">Guide de Création d'Annotations</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-step-forward text-primary"></i> Étapes</h6>
+                    <ol class="small">
+                        <li>Sélectionnez la phrase à annoter</li>
+                        <li>Choisissez le type d'entité approprié</li>
+                        <li>Saisissez le texte exact de l'entité</li>
+                        <li>Ajustez les positions si nécessaire</li>
+                        <li>Vérifiez et créez l'annotation</li>
+                    </ol>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-exclamation-triangle text-warning"></i> Bonnes Pratiques</h6>
+                    <ul class="small">
+                        <li>Utilisez le texte exact de la phrase</li>
+                        <li>Respectez la casse et la ponctuation</li>
+                        <li>Évitez les espaces en début/fin</li>
+                        <li>Choisissez le type d'entité le plus précis</li>
+                        <li>Vérifiez les positions avant validation</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Mise à jour de l'aperçu de phrase
+document.getElementById('sentence-select').addEventListener('change', function() {
+    const selectedOption = this.selectedOptions[0];
+    const preview = document.getElementById('sentence-preview');
+    
+    if (selectedOption.value) {
+        const sentenceText = selectedOption.getAttribute('data-text');
+        preview.innerHTML = sentenceText;
+        preview.style.fontStyle = 'normal';
+    } else {
+        preview.innerHTML = '<em class="text-muted">Sélectionnez une phrase pour voir son contenu...</em>';
+    }
+});
+
+// Auto-calcul des positions
+document.querySelector('input[name="text_value"]').addEventListener('input', function() {
+    const textValue = this.value.trim();
+    const preview = document.getElementById('sentence-preview');
+    const sentenceText = preview.textContent;
+    
+    if (textValue && sentenceText && !sentenceText.includes('Sélectionnez')) {
+        const startPos = sentenceText.indexOf(textValue);
+        if (startPos !== -1) {
+            document.querySelector('input[name="start_position"]').value = startPos;
+            document.querySelector('input[name="end_position"]').value = startPos + textValue.length;
+        }
+    }
+});
+
+// Sélection de texte dans l'aperçu
+document.getElementById('sentence-preview').addEventListener('mouseup', function() {
+    const selection = window.getSelection();
+    if (selection.toString().length > 0) {
+        const selectedText = selection.toString().trim();
+        document.querySelector('input[name="text_value"]').value = selectedText;
+        
+        // Déclencher l'événement input pour calculer les positions
+        document.querySelector('input[name="text_value"]').dispatchEvent(new Event('input'));
+    }
+});
+</script>
+{% endblock %}

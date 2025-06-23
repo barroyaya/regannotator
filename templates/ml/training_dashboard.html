@@ -1,0 +1,351 @@
+
+{% extends 'base.html' %}
+
+{% block title %}Formation IA - RegAnnotator{% endblock %}
+{% block page_title %}Dashboard de Formation IA{% endblock %}
+
+{% block content %}
+<!-- Statistiques -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Sessions d'entraînement</h6>
+                    <p class="stat-number text-primary">{{ trainings|length }}</p>
+                </div>
+                <div class="text-primary">
+                    <i class="fas fa-brain fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Règles expertes</h6>
+                    <p class="stat-number text-success">{{ rules|length }}</p>
+                </div>
+                <div class="text-success">
+                    <i class="fas fa-cogs fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Annotations validées</h6>
+                    <p class="stat-number text-warning">{{ total_annotations }}</p>
+                </div>
+                <div class="text-warning">
+                    <i class="fas fa-check-double fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newTrainingModal">
+                <i class="fas fa-plus"></i> Nouvel Entraînement
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Sessions d'entraînement -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <h5 class="mb-3">Sessions d'Entraînement</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Statut</th>
+                            <th>Précision</th>
+                            <th>Rappel</th>
+                            <th>F1-Score</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for training in trainings %}
+                        <tr>
+                            <td>
+                                <strong>{{ training.name }}</strong>
+                                {% if training.description %}
+                                    <br><small class="text-muted">{{ training.description|truncatechars:50 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ training.status|yesno:'success,warning,danger' }}">
+                                    {{ training.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if training.precision_score %}
+                                    <span class="badge bg-info">{{ training.precision_score|floatformat:3 }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if training.recall_score %}
+                                    <span class="badge bg-info">{{ training.recall_score|floatformat:3 }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if training.f1_score %}
+                                    <span class="badge bg-info">{{ training.f1_score|floatformat:3 }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ training.created_at|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="#" class="btn btn-outline-primary" title="Voir détails">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if training.status == 'completed' %}
+                                        <a href="#" class="btn btn-outline-success" title="Activer">
+                                            <i class="fas fa-power-off"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                Aucune session d'entraînement trouvée.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Règles expertes -->
+<div class="row">
+    <div class="col-12">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>Règles Expertes</h5>
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newRuleModal">
+                    <i class="fas fa-plus"></i> Nouvelle Règle
+                </button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Entité</th>
+                            <th>Type</th>
+                            <th>Pattern</th>
+                            <th>Confiance</th>
+                            <th>Utilisations</th>
+                            <th>Succès</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rule in rules %}
+                        <tr>
+                            <td>
+                                <strong>{{ rule.name }}</strong>
+                                {% if not rule.is_active %}
+                                    <span class="badge bg-secondary ms-1">Inactif</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge" style="background-color: {{ rule.entity_type.color }};">
+                                    {{ rule.entity_type.name }}
+                                </span>
+                            </td>
+                            <td>{{ rule.get_rule_type_display }}</td>
+                            <td>
+                                <code class="small">{{ rule.pattern|truncatechars:30 }}</code>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                        <div class="progress-bar" 
+                                             style="width: {{ rule.confidence_percent }}%"
+                                             role="progressbar"></div>
+                                    </div>
+                                    <small>{{ rule.confidence_score|floatformat:2 }}</small>
+                                </div>
+                            </td>
+                            <td>{{ rule.usage_count }}</td>
+                            <td>
+                                <span class="badge bg-{{ rule.success_rate|floatformat:0|yesno:'success,warning,danger' }}">
+                                    {{ rule.success_rate|floatformat:0 }}%
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="#" class="btn btn-outline-primary" title="Éditer">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="#" class="btn btn-outline-secondary" title="Test">
+                                        <i class="fas fa-play"></i>
+                                    </a>
+                                    {% if rule.is_active %}
+                                        <a href="#" class="btn btn-outline-warning" title="Désactiver">
+                                            <i class="fas fa-pause"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="#" class="btn btn-outline-success" title="Activer">
+                                            <i class="fas fa-play"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                Aucune règle experte définie.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal nouvel entraînement -->
+<div class="modal fade" id="newTrainingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouvelle Session d'Entraînement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'ml:create_training' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nom de la session</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Cette session utilisera toutes les annotations validées ({{ total_annotations }}) pour l'entraînement.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-brain"></i> Démarrer l'Entraînement
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal nouvelle règle -->
+<div class="modal fade" id="newRuleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouvelle Règle Experte</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'ml:create_rule' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="rule_name" class="form-label">Nom de la règle</label>
+                                <input type="text" class="form-control" id="rule_name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="entity_type" class="form-label">Type d'entité</label>
+                                <select class="form-select" id="entity_type" name="entity_type" required>
+                                    <option value="">Choisir...</option>
+                                    <!-- Options à remplir dynamiquement -->
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="rule_type" class="form-label">Type de règle</label>
+                                <select class="form-select" id="rule_type" name="rule_type" required>
+                                    <option value="">Choisir...</option>
+                                    <option value="pattern">Pattern RegEx</option>
+                                    <option value="keyword">Mots-clés</option>
+                                    <option value="context">Contexte</option>
+                                    <option value="position">Position</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="pattern" class="form-label">Pattern/Condition</label>
+                                <textarea class="form-control" id="pattern" name="pattern" rows="4" required
+                                          placeholder="Ex: Type\s+(I[AB]|II[AB]?)\b pour RegEx ou 'mot1,mot2,mot3' pour mots-clés"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confidence_score" class="form-label">Score de confiance</label>
+                                <input type="range" class="form-range" id="confidence_score" name="confidence_score" 
+                                       min="0" max="1" step="0.01" value="0.9">
+                                <div class="d-flex justify-content-between">
+                                    <small>0.0</small>
+                                    <small id="confidence_value">0.9</small>
+                                    <small>1.0</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Attention :</strong> Testez votre règle avant de l'activer pour éviter de fausses détections.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-play"></i> Tester
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Créer la Règle
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Mise à jour du score de confiance
+document.getElementById('confidence_score').addEventListener('input', function(e) {
+    document.getElementById('confidence_value').textContent = e.target.value;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,208 @@
+# ===== templates/export/dashboard.html =====
+"""
+{% extends 'base.html' %}
+
+{% block title %}Export/Import - RegAnnotator{% endblock %}
+{% block page_title %}Export et Import de Données{% endblock %}
+
+{% block content %}
+<!-- Actions rapides -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h5 class="mb-3">Exports Rapides</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <a href="{% url 'export:export_annotations' %}?format=csv" class="btn btn-outline-primary w-100 mb-2">
+                        <i class="fas fa-file-csv"></i><br>
+                        Toutes Annotations CSV
+                    </a>
+                </div>
+                <div class="col-md-4">
+                    <a href="{% url 'export:export_annotations' %}?format=json" class="btn btn-outline-success w-100 mb-2">
+                        <i class="fas fa-file-code"></i><br>
+                        Toutes Annotations JSON
+                    </a>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-warning w-100 mb-2" data-bs-toggle="modal" data-bs-target="#importModal">
+                        <i class="fas fa-file-upload"></i><br>
+                        Importer Annotations
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card text-center">
+            <h6 class="text-muted mb-2">Formats Supportés</h6>
+            <div class="d-flex justify-content-around">
+                <div>
+                    <i class="fas fa-file-csv fa-2x text-primary"></i>
+                    <br><small>CSV</small>
+                </div>
+                <div>
+                    <i class="fas fa-file-code fa-2x text-success"></i>
+                    <br><small>JSON</small>
+                </div>
+                <div>
+                    <i class="fas fa-file-alt fa-2x text-warning"></i>
+                    <br><small>XML</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export par document -->
+<div class="stat-card">
+    <h5 class="mb-3">Export par Document</h5>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Document</th>
+                    <th>Source</th>
+                    <th>Annotations</th>
+                    <th>Dernière Modification</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for document in documents %}
+                <tr>
+                    <td>
+                        <strong>{{ document.title|truncatechars:50 }}</strong>
+                        <br><small class="text-muted">{{ document.get_document_type_display }}</small>
+                    </td>
+                    <td>
+                        <span class="badge bg-info">{{ document.source.acronym }}</span>
+                    </td>
+                    <td>
+                        {% with annotations_count=document.sentences.all.annotations.count %}
+                            <span class="badge bg-primary">{{ annotations_count }}</span>
+                        {% endwith %}
+                    </td>
+                    <td>{{ document.updated_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary dropdown-toggle" type="button" 
+                                    data-bs-toggle="dropdown">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" 
+                                       href="{% url 'export:export_annotations' %}?format=csv&document_id={{ document.id }}">
+                                        <i class="fas fa-file-csv"></i> CSV
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" 
+                                       href="{% url 'export:export_annotations' %}?format=json&document_id={{ document.id }}">
+                                        <i class="fas fa-file-code"></i> JSON
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" 
+                                       href="{% url 'export:export_document_report' document.id %}">
+                                        <i class="fas fa-chart-bar"></i> Rapport Complet
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <a href="{% url 'dashboard:document_detail' document.id %}" 
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        Aucun document trouvé.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal d'import -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Importer des Annotations</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data" action="{% url 'export:import_annotations' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="document_id" class="form-label">Document cible</label>
+                        <select class="form-select" id="document_id" name="document_id" required>
+                            <option value="">Choisir un document...</option>
+                            {% for document in documents %}
+                                <option value="{{ document.id }}">{{ document.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Fichier d'annotations</label>
+                        <input type="file" class="form-control" id="file" name="file" 
+                               accept=".json,.csv" required>
+                        <div class="form-text">
+                            Formats acceptés: JSON, CSV. Le fichier doit respecter le format d'export RegAnnotator.
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Attention:</strong> L'import ajoutera de nouvelles annotations sans supprimer les existantes.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Importer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Historique des exports (optionnel) -->
+<div class="stat-card mt-4">
+    <h5 class="mb-3">Historique des Exports Récents</h5>
+    <div class="list-group">
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Export CSV complet</strong>
+                <br><small class="text-muted">Aujourd'hui à 14:30 par admin</small>
+            </div>
+            <span class="badge bg-success">1,247 annotations</span>
+        </div>
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Rapport Document EMA-001</strong>
+                <br><small class="text-muted">Hier à 16:15 par expert1</small>
+            </div>
+            <span class="badge bg-info">89 annotations</span>
+        </div>
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Export JSON validées uniquement</strong>
+                <br><small class="text-muted">Il y a 2 jours à 09:45 par admin</small>
+            </div>
+            <span class="badge bg-warning">956 annotations</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

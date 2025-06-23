@@ -1,0 +1,1007 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Créer une Règle Experte{% endblock %}
+{% block page_title %}Créer une Nouvelle Règle Experte{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rule-wizard {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        margin-bottom: 2rem;
+    }
+    
+    .wizard-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .step-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    
+    .step {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        background: #f8f9fa;
+        margin: 0 0.5rem;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .step.active {
+        background: var(--primary-color);
+        color: white;
+        transform: scale(1.05);
+    }
+    
+    .step.completed {
+        background: var(--accent-color);
+        color: white;
+    }
+    
+    .step-number {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .step:not(.active):not(.completed) .step-number {
+        background: #dee2e6;
+        color: #6c757d;
+    }
+    
+    .rule-type-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .rule-type-card {
+        border: 2px solid #dee2e6;
+        border-radius: 12px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+        position: relative;
+        background: white;
+    }
+    
+    .rule-type-card:hover {
+        border-color: var(--primary-color);
+        background: #f8f9fa;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .rule-type-card.selected {
+        border-color: var(--primary-color);
+        background: var(--primary-color);
+        color: white;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(44, 90, 160, 0.3);
+    }
+    
+    .rule-type-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        color: white;
+        font-size: 2rem;
+        transition: all 0.3s ease;
+    }
+    
+    .rule-type-card.selected .rule-type-icon {
+        background: rgba(255,255,255,0.2);
+        transform: scale(1.1);
+    }
+    
+    .entity-selection-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .entity-card {
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+        background: white;
+    }
+    
+    .entity-card:hover {
+        border-color: var(--primary-color);
+        background: #f8f9fa;
+    }
+    
+    .entity-card.selected {
+        border-color: var(--primary-color);
+        background: var(--primary-color);
+        color: white;
+    }
+    
+    .pattern-editor {
+        background: #1a1a1a;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .pattern-input {
+        background: transparent;
+        border: none;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        font-size: 1rem;
+        width: 100%;
+        outline: none;
+        resize: vertical;
+        min-height: 120px;
+    }
+    
+    .pattern-input::placeholder {
+        color: #666;
+    }
+    
+    .pattern-help {
+        background: #e3f2fd;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .pattern-examples {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .example-item {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+    }
+    
+    .example-item:hover {
+        border-color: var(--primary-color);
+        background: #f8f9fa;
+    }
+    
+    .test-zone {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+    
+    .test-input {
+        width: 100%;
+        min-height: 100px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 0.75rem;
+        resize: vertical;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    .test-results {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-top: 1rem;
+        min-height: 100px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .match-highlight {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 3px;
+        padding: 2px 4px;
+        margin: 1px;
+        position: relative;
+        cursor: pointer;
+    }
+    
+    .match-highlight:hover {
+        background-color: #ffe69c;
+    }
+    
+    .confidence-slider {
+        margin: 1rem 0;
+    }
+    
+    .confidence-value {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: var(--primary-color);
+    }
+    
+    .confidence-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
+    
+    .summary-card {
+        background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+    
+    .summary-item {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        padding: 0.5rem;
+        background: rgba(255,255,255,0.7);
+        border-radius: 4px;
+    }
+    
+    .navigation-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .rule-preview {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .validation-feedback {
+        padding: 0.75rem;
+        border-radius: 4px;
+        margin: 0.5rem 0;
+        display: none;
+    }
+    
+    .validation-success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    
+    .validation-error {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    
+    .wizard-step {
+        display: none;
+    }
+    
+    .wizard-step.active {
+        display: block;
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .keyword-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1rem 0;
+    }
+    
+    .keyword-tag {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+    }
+    
+    .keyword-tag .remove {
+        margin-left: 0.5rem;
+        cursor: pointer;
+    }
+    
+    .add-keyword {
+        display: flex;
+        gap: 0.5rem;
+        margin: 1rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête du wizard -->
+    <div class="wizard-header">
+        <h2><i class="fas fa-magic"></i> Assistant de Création de Règles Expertes</h2>
+        <p class="mb-0">Créez des règles personnalisées pour améliorer la précision de l'extraction d'entités</p>
+    </div>
+
+    <!-- Indicateur d'étapes -->
+    <div class="step-indicator">
+        <div class="step active" data-step="1">
+            <div class="step-number">1</div>
+            <span>Type de Règle</span>
+        </div>
+        <div class="step" data-step="2">
+            <div class="step-number">2</div>
+            <span>Configuration</span>
+        </div>
+        <div class="step" data-step="3">
+            <div class="step-number">3</div>
+            <span>Test & Validation</span>
+        </div>
+        <div class="step" data-step="4">
+            <div class="step-number">4</div>
+            <span>Finalisation</span>
+        </div>
+    </div>
+
+    <form method="post" id="rule-form">
+        {% csrf_token %}
+        
+        <!-- Étape 1: Type de règle -->
+        <div class="wizard-step active" data-step="1">
+            <div class="rule-wizard">
+                <h4 class="mb-3">Choisissez le type de règle</h4>
+                <p class="text-muted">Sélectionnez le type de règle qui correspond le mieux à votre besoin d'extraction.</p>
+                
+                <div class="rule-type-grid">
+                    {% for type_code, type_name in rule_types %}
+                    <div class="rule-type-card" data-type="{{ type_code }}">
+                        <div class="rule-type-icon">
+                            {% if type_code == 'pattern' %}
+                                <i class="fas fa-code"></i>
+                            {% elif type_code == 'keyword' %}
+                                <i class="fas fa-key"></i>
+                            {% elif type_code == 'context' %}
+                                <i class="fas fa-sitemap"></i>
+                            {% elif type_code == 'position' %}
+                                <i class="fas fa-crosshairs"></i>
+                            {% endif %}
+                        </div>
+                        <h5>{{ type_name }}</h5>
+                        <p class="text-muted">
+                            {% if type_code == 'pattern' %}
+                                Utilisez des expressions régulières pour détecter des motifs complexes
+                            {% elif type_code == 'keyword' %}
+                                Détectez des entités basées sur des mots-clés spécifiques
+                            {% elif type_code == 'context' %}
+                                Analysez le contexte autour des entités pour améliorer la précision
+                            {% elif type_code == 'position' %}
+                                Utilisez la position dans le document pour identifier les entités
+                            {% endif %}
+                        </p>
+                        <input type="radio" name="rule_type" value="{{ type_code }}" style="display: none;" required>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Étape 2: Configuration -->
+        <div class="wizard-step" data-step="2">
+            <div class="rule-wizard">
+                <h4 class="mb-3">Configuration de la règle</h4>
+                
+                <!-- Informations générales -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label for="rule-name" class="form-label">Nom de la règle *</label>
+                        <input type="text" class="form-control" id="rule-name" name="name" 
+                               placeholder="Ex: Détection articles de loi" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="entity-type" class="form-label">Type d'entité cible *</label>
+                        <select class="form-select" id="entity-type" name="entity_type_id" required>
+                            <option value="">Sélectionnez un type d'entité</option>
+                            {% for entity in entities %}
+                                <option value="{{ entity.id }}">{{ entity.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Configuration spécifique au type de règle -->
+                <div id="pattern-config" class="config-section">
+                    <h5>Configuration Pattern RegEx</h5>
+                    <div class="pattern-help">
+                        <h6><i class="fas fa-info-circle"></i> Guide RegEx</h6>
+                        <p>Utilisez les expressions régulières pour définir des motifs complexes :</p>
+                        <ul class="mb-0">
+                            <li><code>\d+</code> : un ou plusieurs chiffres</li>
+                            <li><code>[A-Z]</code> : une lettre majuscule</li>
+                            <li><code>\w+</code> : un ou plusieurs caractères alphanumériques</li>
+                            <li><code>.*</code> : n'importe quels caractères</li>
+                        </ul>
+                    </div>
+                    
+                    <label for="pattern" class="form-label">Expression régulière *</label>
+                    <div class="pattern-editor">
+                        <textarea class="pattern-input" id="pattern" name="pattern" 
+                                  placeholder="Ex: Article\s+L\.\d+-\d+"></textarea>
+                    </div>
+                    
+                    <div class="pattern-examples">
+                        <h6>Exemples courants :</h6>
+                        <div class="example-item" onclick="useExample('Article\\s+L\\.\\d+-\\d+')">
+                            Article L.123-4 du Code
+                        </div>
+                        <div class="example-item" onclick="useExample('\\d{2}/\\d{2}/\\d{4}')">
+                            Dates au format DD/MM/YYYY
+                        </div>
+                        <div class="example-item" onclick="useExample('Autorité\\s+de\\s+\\w+')">
+                            Autorités réglementaires
+                        </div>
+                    </div>
+                </div>
+
+                <div id="keyword-config" class="config-section">
+                    <h5>Configuration Mots-clés</h5>
+                    <p class="text-muted">Ajoutez des mots-clés qui identifient votre entité.</p>
+                    
+                    <div class="add-keyword">
+                        <input type="text" class="form-control" id="keyword-input" 
+                               placeholder="Tapez un mot-clé et appuyez sur Entrée">
+                        <button type="button" class="btn btn-primary" onclick="addKeyword()">
+                            <i class="fas fa-plus"></i> Ajouter
+                        </button>
+                    </div>
+                    
+                    <div class="keyword-tags" id="keyword-tags"></div>
+                    <input type="hidden" id="keywords-hidden" name="pattern">
+                </div>
+
+                <!-- Niveau de confiance -->
+                <div class="confidence-slider">
+                    <label for="confidence" class="form-label">
+                        Niveau de confiance : <span class="confidence-value" id="confidence-display">1.0</span>
+                    </label>
+                    <input type="range" class="form-range" id="confidence" name="confidence_score" 
+                           min="0.1" max="1.0" step="0.1" value="1.0" 
+                           oninput="updateConfidenceDisplay(this.value)">
+                    <div class="confidence-labels">
+                        <span>0.1 (Faible)</span>
+                        <span>0.5 (Moyen)</span>
+                        <span>1.0 (Fort)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Étape 3: Test & Validation -->
+        <div class="wizard-step" data-step="3">
+            <div class="rule-wizard">
+                <h4 class="mb-3">Test de la règle</h4>
+                <p class="text-muted">Testez votre règle sur des exemples de texte pour valider son fonctionnement.</p>
+                
+                <div class="test-zone">
+                    <label for="test-text" class="form-label">Texte de test</label>
+                    <textarea class="test-input" id="test-text" 
+                              placeholder="Saisissez un texte d'exemple pour tester votre règle...
+
+Exemple:
+L'article L.123-4 du Code de la consommation précise que l'Autorité de régulation doit publier ses décisions avant le 31 décembre 2024."></textarea>
+                    
+                    <button type="button" class="btn btn-primary mt-2" onclick="testRule()">
+                        <i class="fas fa-play"></i> Tester la règle
+                    </button>
+                    
+                    <div class="validation-feedback validation-success" id="test-success">
+                        <i class="fas fa-check-circle"></i> <span id="success-message"></span>
+                    </div>
+                    
+                    <div class="validation-feedback validation-error" id="test-error">
+                        <i class="fas fa-exclamation-triangle"></i> <span id="error-message"></span>
+                    </div>
+                    
+                    <div class="test-results" id="test-results">
+                        <div class="text-muted text-center py-3">
+                            <i class="fas fa-flask fa-2x mb-2"></i>
+                            <p>Les résultats du test apparaîtront ici</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Étape 4: Finalisation -->
+        <div class="wizard-step" data-step="4">
+            <div class="rule-wizard">
+                <h4 class="mb-3">Résumé et finalisation</h4>
+                <p class="text-muted">Vérifiez les informations de votre règle avant de la créer.</p>
+                
+                <div class="summary-card">
+                    <h5 class="mb-3">Résumé de la règle</h5>
+                    
+                    <div class="summary-item">
+                        <strong>Nom :</strong>
+                        <span id="summary-name">—</span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <strong>Type :</strong>
+                        <span id="summary-type">—</span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <strong>Entité cible :</strong>
+                        <span id="summary-entity">—</span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <strong>Pattern/Mots-clés :</strong>
+                        <span id="summary-pattern">—</span>
+                    </div>
+                    
+                    <div class="summary-item">
+                        <strong>Confiance :</strong>
+                        <span id="summary-confidence">—</span>
+                    </div>
+                </div>
+                
+                <div class="rule-preview">
+                    <h6><i class="fas fa-eye"></i> Aperçu de la règle</h6>
+                    <div id="rule-preview-content">
+                        <!-- Le contenu sera généré dynamiquement -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation-buttons">
+            <button type="button" class="btn btn-secondary" id="prev-btn" onclick="previousStep()" style="display: none;">
+                <i class="fas fa-arrow-left"></i> Précédent
+            </button>
+            
+            <div>
+                <a href="{% url 'ml:expert_rules' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i> Annuler
+                </a>
+            </div>
+            
+            <button type="button" class="btn btn-primary" id="next-btn" onclick="nextStep()">
+                Suivant <i class="fas fa-arrow-right"></i>
+            </button>
+            
+            <button type="submit" class="btn btn-success" id="submit-btn" style="display: none;">
+                <i class="fas fa-check"></i> Créer la règle
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStep = 1;
+const totalSteps = 4;
+let keywords = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestion des types de règles
+    document.querySelectorAll('.rule-type-card').forEach(card => {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.rule-type-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+            
+            const ruleType = this.dataset.type;
+            showConfigForType(ruleType);
+            validateCurrentStep();
+        });
+    });
+    
+    // Gestion des entités
+    document.querySelectorAll('.entity-card').forEach(card => {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.entity-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+            validateCurrentStep();
+        });
+    });
+    
+    // Gestion de l'input des mots-clés
+    document.getElementById('keyword-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addKeyword();
+        }
+    });
+    
+    // Mise à jour en temps réel du résumé
+    document.getElementById('rule-name').addEventListener('input', updateSummary);
+    document.getElementById('pattern').addEventListener('input', updateSummary);
+    document.getElementById('confidence').addEventListener('input', updateSummary);
+    
+    // Masquer toutes les sections de config au début
+    hideAllConfigSections();
+});
+
+function showConfigForType(ruleType) {
+    hideAllConfigSections();
+    
+    const configSection = document.getElementById(ruleType + '-config');
+    if (configSection) {
+        configSection.style.display = 'block';
+    }
+}
+
+function hideAllConfigSections() {
+    document.querySelectorAll('.config-section').forEach(section => {
+        section.style.display = 'none';
+    });
+}
+
+function nextStep() {
+    if (!validateCurrentStep()) {
+        return;
+    }
+    
+    if (currentStep < totalSteps) {
+        currentStep++;
+        showStep(currentStep);
+        updateStepIndicator();
+        updateNavigation();
+        updateSummary();
+    }
+}
+
+function previousStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+        updateStepIndicator();
+        updateNavigation();
+    }
+}
+
+function showStep(stepNumber) {
+    document.querySelectorAll('.wizard-step').forEach(step => {
+        step.classList.remove('active');
+    });
+    
+    const currentStepElement = document.querySelector(`[data-step="${stepNumber}"]`);
+    if (currentStepElement && currentStepElement.classList.contains('wizard-step')) {
+        currentStepElement.classList.add('active');
+    }
+}
+
+function updateStepIndicator() {
+    document.querySelectorAll('.step').forEach((step, index) => {
+        step.classList.remove('active', 'completed');
+        
+        if (index + 1 < currentStep) {
+            step.classList.add('completed');
+        } else if (index + 1 === currentStep) {
+            step.classList.add('active');
+        }
+    });
+}
+
+function updateNavigation() {
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    prevBtn.style.display = currentStep > 1 ? 'block' : 'none';
+    
+    if (currentStep === totalSteps) {
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'block';
+    } else {
+        nextBtn.style.display = 'block';
+        submitBtn.style.display = 'none';
+    }
+}
+
+function validateCurrentStep() {
+    switch(currentStep) {
+        case 1:
+            return document.querySelector('input[name="rule_type"]:checked') !== null;
+        case 2:
+            const name = document.getElementById('rule-name').value.trim();
+            const entityType = document.getElementById('entity-type').value;
+            const ruleType = document.querySelector('input[name="rule_type"]:checked')?.value;
+            
+            let hasPattern = false;
+            if (ruleType === 'pattern') {
+                hasPattern = document.getElementById('pattern').value.trim() !== '';
+            } else if (ruleType === 'keyword') {
+                hasPattern = keywords.length > 0;
+            } else {
+                hasPattern = true; // Pour les autres types, considérer comme valide pour le moment
+            }
+            
+            return name && entityType && hasPattern;
+        case 3:
+            return true; // Étape de test, toujours valide
+        case 4:
+            return true; // Étape de résumé, toujours valide
+        default:
+            return false;
+    }
+}
+
+function addKeyword() {
+    const input = document.getElementById('keyword-input');
+    const keyword = input.value.trim();
+    
+    if (keyword && !keywords.includes(keyword)) {
+        keywords.push(keyword);
+        updateKeywordTags();
+        input.value = '';
+        
+        // Mettre à jour le champ pattern caché
+        document.getElementById('keywords-hidden').value = keywords.join(',');
+        validateCurrentStep();
+    }
+}
+
+function removeKeyword(keyword) {
+    keywords = keywords.filter(k => k !== keyword);
+    updateKeywordTags();
+    document.getElementById('keywords-hidden').value = keywords.join(',');
+    validateCurrentStep();
+}
+
+function updateKeywordTags() {
+    const container = document.getElementById('keyword-tags');
+    container.innerHTML = '';
+    
+    keywords.forEach(keyword => {
+        const tag = document.createElement('div');
+        tag.className = 'keyword-tag';
+        tag.innerHTML = `
+            ${keyword}
+            <span class="remove" onclick="removeKeyword('${keyword}')">
+                <i class="fas fa-times"></i>
+            </span>
+        `;
+        container.appendChild(tag);
+    });
+}
+
+function useExample(pattern) {
+    document.getElementById('pattern').value = pattern;
+    validateCurrentStep();
+}
+
+function updateConfidenceDisplay(value) {
+    document.getElementById('confidence-display').textContent = value;
+}
+
+function testRule() {
+    const ruleType = document.querySelector('input[name="rule_type"]:checked')?.value;
+    const testText = document.getElementById('test-text').value.trim();
+    const successDiv = document.getElementById('test-success');
+    const errorDiv = document.getElementById('test-error');
+    const resultsDiv = document.getElementById('test-results');
+    
+    // Cacher les messages précédents
+    successDiv.style.display = 'none';
+    errorDiv.style.display = 'none';
+    
+    if (!testText) {
+        showError('Veuillez saisir un texte de test');
+        return;
+    }
+    
+    let pattern = '';
+    if (ruleType === 'pattern') {
+        pattern = document.getElementById('pattern').value.trim();
+    } else if (ruleType === 'keyword') {
+        pattern = keywords.join(',');
+    }
+    
+    if (!pattern) {
+        showError('Veuillez définir un pattern ou des mots-clés');
+        return;
+    }
+    
+    // Appel API pour tester la règle
+    fetch('{% url "ml:api_test_rule" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({
+            pattern: pattern,
+            rule_type: ruleType,
+            test_text: testText
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showError(data.error);
+        } else {
+            showTestResults(data, testText);
+        }
+    })
+    .catch(error => {
+        showError('Erreur lors du test de la règle');
+    });
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('test-error');
+    document.getElementById('error-message').textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function showTestResults(data, originalText) {
+    const successDiv = document.getElementById('test-success');
+    const resultsDiv = document.getElementById('test-results');
+    
+    document.getElementById('success-message').textContent = 
+        `${data.match_count} correspondance(s) trouvée(s)`;
+    successDiv.style.display = 'block';
+    
+    let highlightedText = originalText;
+    
+    if (data.matches && data.matches.length > 0) {
+        // Trier les matches par position pour éviter les conflits
+        data.matches.sort((a, b) => b.start_position - a.start_position);
+        
+        data.matches.forEach(match => {
+            const before = highlightedText.substring(0, match.start_position);
+            const matchText = highlightedText.substring(match.start_position, match.end_position);
+            const after = highlightedText.substring(match.end_position);
+            
+            highlightedText = before + 
+                `<span class="match-highlight" title="Confiance: ${match.confidence_score}">${matchText}</span>` + 
+                after;
+        });
+        
+        resultsDiv.innerHTML = `
+            <h6>Résultats du test :</h6>
+            <div class="border p-2 mb-3" style="line-height: 1.8;">${highlightedText}</div>
+            <h6>Détails des correspondances :</h6>
+            <ul class="list-group">
+                ${data.matches.map(match => `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><code>"${match.text_value}"</code> (${match.start_position}-${match.end_position})</span>
+                        <span class="badge bg-primary">${match.confidence_score}</span>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    } else {
+        resultsDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Aucune correspondance trouvée dans le texte de test.
+            </div>
+        `;
+    }
+}
+
+function updateSummary() {
+    const name = document.getElementById('rule-name').value || '—';
+    const ruleType = document.querySelector('input[name="rule_type"]:checked');
+    const entitySelect = document.getElementById('entity-type');
+    const confidence = document.getElementById('confidence').value;
+    
+    document.getElementById('summary-name').textContent = name;
+    document.getElementById('summary-type').textContent = ruleType ? ruleType.nextElementSibling.textContent : '—';
+    document.getElementById('summary-entity').textContent = entitySelect.selectedOptions[0]?.textContent || '—';
+    document.getElementById('summary-confidence').textContent = confidence;
+    
+    // Pattern/Keywords
+    const selectedRuleType = ruleType?.value;
+    let patternText = '—';
+    if (selectedRuleType === 'pattern') {
+        patternText = document.getElementById('pattern').value || '—';
+    } else if (selectedRuleType === 'keyword') {
+        patternText = keywords.length > 0 ? keywords.join(', ') : '—';
+    }
+    document.getElementById('summary-pattern').textContent = patternText;
+    
+    // Générer l'aperçu
+    updateRulePreview();
+}
+
+function updateRulePreview() {
+    const previewDiv = document.getElementById('rule-preview-content');
+    const ruleType = document.querySelector('input[name="rule_type"]:checked')?.value;
+    const name = document.getElementById('rule-name').value;
+    const entity = document.getElementById('entity-type').selectedOptions[0]?.textContent;
+    
+    if (name && ruleType && entity) {
+        previewDiv.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Type :</strong> ${ruleType.toUpperCase()}<br>
+                    <strong>Cible :</strong> ${entity}<br>
+                    <strong>Confiance :</strong> ${document.getElementById('confidence').value}
+                </div>
+                <div class="col-md-6">
+                    <strong>Pattern :</strong><br>
+                    <code>${ruleType === 'keyword' ? keywords.join(', ') : document.getElementById('pattern').value}</code>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Validation du formulaire avant soumission
+document.getElementById('rule-form').addEventListener('submit', function(e) {
+    if (!validateCurrentStep()) {
+        e.preventDefault();
+        alert('Veuillez remplir tous les champs requis');
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,756 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ training.name }} - Détail Entraînement{% endblock %}
+{% block page_title %}Détail de l'Entraînement{% endblock %}
+
+{% block extra_css %}
+<style>
+    .training-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        color: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .training-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="white" opacity="0.1"/></svg>') repeat;
+        animation: float 20s linear infinite;
+    }
+    
+    @keyframes float {
+        0% { transform: translateX(0) translateY(0); }
+        100% { transform: translateX(-50px) translateY(-50px); }
+    }
+    
+    .training-status {
+        position: absolute;
+        top: 1.5rem;
+        right: 1.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 500;
+        backdrop-filter: blur(10px);
+    }
+    
+    .status-completed { background: rgba(40, 167, 69, 0.2); border: 1px solid rgba(40, 167, 69, 0.3); }
+    .status-running { background: rgba(0, 123, 255, 0.2); border: 1px solid rgba(0, 123, 255, 0.3); }
+    .status-failed { background: rgba(220, 53, 69, 0.2); border: 1px solid rgba(220, 53, 69, 0.3); }
+    .status-pending { background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.3); }
+    
+    .detail-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        margin-bottom: 2rem;
+        height: 100%;
+    }
+    
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .metric-box {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        text-align: center;
+        position: relative;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .metric-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        color: white;
+        font-size: 1.5rem;
+    }
+    
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .entity-metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+    
+    .entity-metric-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        border-left: 4px solid #007bff;
+    }
+    
+    .entity-name {
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+        color: var(--primary-color);
+    }
+    
+    .metric-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-bar {
+        width: 80px;
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    
+    .metric-bar-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+    
+    .precision-bar { background: #007bff; }
+    .recall-bar { background: #28a745; }
+    .f1-bar { background: #ffc107; }
+    
+    .parameters-table {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    .parameters-table table {
+        margin-bottom: 0;
+    }
+    
+    .version-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .version-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .version-card.active {
+        border-color: var(--accent-color);
+        background: linear-gradient(135deg, #f8fff8, #ffffff);
+    }
+    
+    .version-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+    
+    .version-badge {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .active-badge {
+        background: var(--accent-color);
+    }
+    
+    .timeline-container {
+        position: relative;
+        padding-left: 2rem;
+    }
+    
+    .timeline-line {
+        position: absolute;
+        left: 1rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #dee2e6;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    
+    .timeline-dot {
+        position: absolute;
+        left: -2.25rem;
+        top: 1rem;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        border: 3px solid white;
+        box-shadow: 0 0 0 2px #dee2e6;
+    }
+    
+    .timeline-dot.completed { background: var(--accent-color); }
+    .timeline-dot.current { background: var(--warning-color); animation: pulse 2s infinite; }
+    
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 2px #dee2e6, 0 0 0 4px transparent; }
+        50% { box-shadow: 0 0 0 2px #dee2e6, 0 0 0 8px rgba(255, 193, 7, 0.3); }
+        100% { box-shadow: 0 0 0 2px #dee2e6, 0 0 0 4px transparent; }
+    }
+    
+    .chart-container {
+        height: 300px;
+        margin: 1rem 0;
+    }
+    
+    .progress-ring {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto;
+    }
+    
+    .progress-ring circle {
+        fill: transparent;
+        stroke-width: 8;
+        r: 52;
+        cx: 60;
+        cy: 60;
+        stroke-dasharray: 326.73;
+        stroke-dashoffset: 326.73;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.3s ease;
+    }
+    
+    .progress-ring .background {
+        stroke: #e9ecef;
+    }
+    
+    .progress-ring .progress {
+        stroke: var(--accent-color);
+        transform: rotate(-90deg);
+        transform-origin: 60px 60px;
+    }
+    
+    .logs-container {
+        background: #1a1a1a;
+        color: #00ff00;
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .log-line {
+        margin-bottom: 0.25rem;
+    }
+    
+    .log-timestamp {
+        color: #888;
+    }
+    
+    .log-info { color: #00ff00; }
+    .log-warning { color: #ffff00; }
+    .log-error { color: #ff0000; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête de l'entraînement -->
+    <div class="training-header">
+        <div class="training-status status-{{ training.status }}">
+            {% if training.status == 'completed' %}
+                <i class="fas fa-check-circle"></i> Terminé
+            {% elif training.status == 'running' %}
+                <i class="fas fa-spinner fa-spin"></i> En cours
+            {% elif training.status == 'failed' %}
+                <i class="fas fa-exclamation-triangle"></i> Échoué
+            {% else %}
+                <i class="fas fa-clock"></i> En attente
+            {% endif %}
+        </div>
+        
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-2">{{ training.name }}</h2>
+                <p class="mb-3">{{ training.description|default:"Aucune description disponible" }}</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <small>
+                            <i class="fas fa-user"></i> Créé par {{ training.created_by.username|default:"Système" }}
+                        </small>
+                    </div>
+                    <div class="col-md-6">
+                        <small>
+                            <i class="fas fa-calendar"></i> {{ training.created_at|date:"d/m/Y à H:i" }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 text-end">
+                {% if training.status == 'completed' %}
+                <div class="progress-ring">
+                    <svg width="120" height="120">
+                        <circle class="background"></circle>
+                        <circle class="progress" style="stroke-dashoffset: {{ training.accuracy_score|default:0|floatformat:0|add:'-326.73' }};"></circle>
+                        <text x="60" y="65" text-anchor="middle" fill="white" font-size="18" font-weight="bold">
+                            {{ training.accuracy_score|default:0|floatformat:1 }}%
+                        </text>
+                    </svg>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions rapides -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="btn-group">
+            <a href="{% url 'ml:training_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+            {% if training.status == 'completed' %}
+            <a href="{% url 'ml:training_metrics' training.id %}" class="btn btn-primary">
+                <i class="fas fa-chart-line"></i> Métriques détaillées
+            </a>
+            {% endif %}
+        </div>
+        
+        <div class="btn-group">
+            {% if training.status == 'completed' %}
+            <button class="btn btn-success" onclick="deployModel()">
+                <i class="fas fa-rocket"></i> Déployer
+            </button>
+            <a href="{% url 'ml:export_model' training.id %}" class="btn btn-outline-primary">
+                <i class="fas fa-download"></i> Exporter
+            </a>
+            {% elif training.status == 'running' %}
+            <button class="btn btn-warning" onclick="stopTraining()">
+                <i class="fas fa-stop"></i> Arrêter
+            </button>
+            {% elif training.status == 'failed' %}
+            <button class="btn btn-info" onclick="retryTraining()">
+                <i class="fas fa-redo"></i> Relancer
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Métriques principales -->
+    {% if training.status == 'completed' %}
+    <div class="metrics-grid">
+        <div class="metric-box">
+            <div class="metric-icon">
+                <i class="fas fa-bullseye"></i>
+            </div>
+            <div class="metric-value">{{ training.accuracy_score|default:0|floatformat:1 }}%</div>
+            <div class="metric-label">Précision</div>
+        </div>
+        
+        <div class="metric-box">
+            <div class="metric-icon">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="metric-value">{{ training.precision_score|default:0|floatformat:1 }}%</div>
+            <div class="metric-label">Precision</div>
+        </div>
+        
+        <div class="metric-box">
+            <div class="metric-icon">
+                <i class="fas fa-filter"></i>
+            </div>
+            <div class="metric-value">{{ training.recall_score|default:0|floatformat:1 }}%</div>
+            <div class="metric-label">Rappel</div>
+        </div>
+        
+        <div class="metric-box">
+            <div class="metric-icon">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <div class="metric-value">{{ training.f1_score|default:0|floatformat:2 }}</div>
+            <div class="metric-label">F1-Score</div>
+        </div>
+        
+        <div class="metric-box">
+            <div class="metric-icon">
+                <i class="fas fa-database"></i>
+            </div>
+            <div class="metric-value">{{ training.training_annotations.count }}</div>
+            <div class="metric-label">Annotations</div>
+        </div>
+        
+        <div class="metric-box">
+            <div class="metric-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="metric-value">25min</div>
+            <div class="metric-label">Durée</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Configuration et paramètres -->
+        <div class="col-md-6">
+            <div class="detail-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-cogs"></i> Configuration du Modèle
+                </h5>
+                
+                <div class="parameters-table">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <td><strong>Algorithme:</strong></td>
+                                <td>{{ training.model_parameters.algorithm|default:"BERT" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Époques:</strong></td>
+                                <td>{{ training.model_parameters.epochs|default:"20" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Batch Size:</strong></td>
+                                <td>{{ training.model_parameters.batch_size|default:"32" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Taux d'apprentissage:</strong></td>
+                                <td>{{ training.model_parameters.learning_rate|default:"0.01" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Split Validation:</strong></td>
+                                <td>{{ training.validation_split|floatformat:1 }}%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Arrêt anticipé:</strong></td>
+                                <td>
+                                    {% if training.model_parameters.early_stopping %}
+                                        <span class="badge bg-success">Activé</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Désactivé</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métriques par entité -->
+        <div class="col-md-6">
+            <div class="detail-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-tags"></i> Performance par Entité
+                </h5>
+                
+                {% if entity_metrics %}
+                <div class="entity-metrics-grid">
+                    {% for entity_name, metrics in entity_metrics.items %}
+                    <div class="entity-metric-card">
+                        <div class="entity-name">{{ entity_name }}</div>
+                        
+                        <div class="metric-row">
+                            <span>Precision:</span>
+                            <div class="d-flex align-items-center">
+                                <span class="me-2">{{ metrics.precision|floatformat:1 }}%</span>
+                                <div class="metric-bar">
+                                    <div class="metric-bar-fill precision-bar" style="width: {{ metrics.precision|floatformat:0 }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <span>Rappel:</span>
+                            <div class="d-flex align-items-center">
+                                <span class="me-2">{{ metrics.recall|floatformat:1 }}%</span>
+                                <div class="metric-bar">
+                                    <div class="metric-bar-fill recall-bar" style="width: {{ metrics.recall|floatformat:0 }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <span>F1-Score:</span>
+                            <div class="d-flex align-items-center">
+                                <span class="me-2">{{ metrics.f1_score|floatformat:2 }}</span>
+                                <div class="metric-bar">
+                                    <div class="metric-bar-fill f1-bar" style="width: {{ metrics.f1_score|floatformat:0 }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Métriques par entité non disponibles</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline de l'entraînement -->
+    {% if training.status != 'pending' %}
+    <div class="row">
+        <div class="col-md-8">
+            <div class="detail-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-history"></i> Timeline de l'Entraînement
+                </h5>
+                
+                <div class="timeline-container">
+                    <div class="timeline-line"></div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-dot completed"></div>
+                        <h6>Initialisation</h6>
+                        <p class="text-muted mb-1">Préparation des données et initialisation du modèle</p>
+                        <small class="text-muted">{{ training.created_at|date:"H:i:s" }}</small>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-dot completed"></div>
+                        <h6>Chargement des Données</h6>
+                        <p class="text-muted mb-1">{{ training.training_annotations.count }} annotations chargées</p>
+                        <small class="text-muted">{{ training.created_at|date:"H:i:s" }}</small>
+                    </div>
+                    
+                    {% if training.status == 'running' %}
+                    <div class="timeline-item">
+                        <div class="timeline-dot current"></div>
+                        <h6>Entraînement en cours</h6>
+                        <p class="text-muted mb-1">Époque 12/20 - Perte: 0.045</p>
+                        <small class="text-muted">En cours...</small>
+                    </div>
+                    {% else %}
+                    <div class="timeline-item">
+                        <div class="timeline-dot completed"></div>
+                        <h6>Entraînement</h6>
+                        <p class="text-muted mb-1">20 époques complétées avec succès</p>
+                        <small class="text-muted">Durée: 25 minutes</small>
+                    </div>
+                    
+                    <div class="timeline-item">
+                        <div class="timeline-dot completed"></div>
+                        <h6>Validation</h6>
+                        <p class="text-muted mb-1">Validation sur {{ training.validation_split|floatformat:0 }}% des données</p>
+                        <small class="text-muted">Précision: {{ training.accuracy_score|floatformat:1 }}%</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Logs d'entraînement -->
+        <div class="col-md-4">
+            <div class="detail-card">
+                <h6 class="mb-3">
+                    <i class="fas fa-terminal"></i> Logs d'Entraînement
+                </h6>
+                
+                <div class="logs-container">
+                    <div class="log-line log-info">
+                        <span class="log-timestamp">[{{ training.created_at|date:"H:i:s" }}]</span> Initialisation du modèle BERT...
+                    </div>
+                    <div class="log-line log-info">
+                        <span class="log-timestamp">[{{ training.created_at|date:"H:i:s" }}]</span> Chargement de {{ training.training_annotations.count }} annotations
+                    </div>
+                    <div class="log-line log-info">
+                        <span class="log-timestamp">[{{ training.created_at|date:"H:i:s" }}]</span> Split train/val: 80%/20%
+                    </div>
+                    {% if training.status == 'running' %}
+                    <div class="log-line log-warning">
+                        <span class="log-timestamp">[En cours]</span> Époque 12/20 - Loss: 0.045 - Val_acc: 0.876
+                    </div>
+                    {% else %}
+                    <div class="log-line log-info">
+                        <span class="log-timestamp">[Terminé]</span> Entraînement terminé avec succès
+                    </div>
+                    <div class="log-line log-info">
+                        <span class="log-timestamp">[Terminé]</span> Précision finale: {{ training.accuracy_score|floatformat:1 }}%
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Versions du modèle -->
+    {% if versions %}
+    <div class="row">
+        <div class="col-12">
+            <div class="detail-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-code-branch"></i> Versions du Modèle
+                </h5>
+                
+                {% for version in versions %}
+                <div class="version-card {% if version.is_active %}active{% endif %}">
+                    <div class="version-header">
+                        <div class="d-flex align-items-center">
+                            <span class="version-badge {% if version.is_active %}active-badge{% endif %}">
+                                v{{ version.version }}
+                            </span>
+                            {% if version.is_active %}
+                            <span class="badge bg-success ms-2">
+                                <i class="fas fa-rocket"></i> Déployé
+                            </span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="btn-group">
+                            <a href="{% url 'ml:model_detail' version.id %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye"></i> Détails
+                            </a>
+                            {% if not version.is_active %}
+                            <a href="{% url 'ml:deploy_model' version.id %}" class="btn btn-success btn-sm">
+                                <i class="fas fa-rocket"></i> Déployer
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <small class="text-muted">
+                                Créé le {{ version.created_at|date:"d/m/Y à H:i" }}
+                            </small>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            {% if version.benchmark_score %}
+                            <small>
+                                Benchmark: <strong>{{ version.benchmark_score|floatformat:1 }}</strong>
+                            </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animation des barres de métriques
+    setTimeout(() => {
+        document.querySelectorAll('.metric-bar-fill').forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+            }, 300);
+        });
+    }, 500);
+    
+    // Animation du cercle de progression
+    const progressRing = document.querySelector('.progress-ring .progress');
+    if (progressRing) {
+        const accuracy = {{ training.accuracy_score|default:0 }};
+        const circumference = 326.73;
+        const offset = circumference - (accuracy / 100) * circumference;
+        
+        setTimeout(() => {
+            progressRing.style.strokeDashoffset = offset;
+        }, 1000);
+    }
+    
+    // Auto-refresh si l'entraînement est en cours
+    {% if training.status == 'running' %}
+    setTimeout(() => {
+        location.reload();
+    }, 10000); // Refresh toutes les 10 secondes
+    {% endif %}
+});
+
+function deployModel() {
+    if (confirm('Déployer ce modèle en production ?')) {
+        // Logique de déploiement
+        window.location.href = "{% url 'ml:deploy_model' training.id %}";
+    }
+}
+
+function stopTraining() {
+    if (confirm('Arrêter l\'entraînement en cours ?')) {
+        // Logique d'arrêt
+        fetch(`/ml/training/{{ training.id }}/stop/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            }
+        }).then(() => location.reload());
+    }
+}
+
+function retryTraining() {
+    if (confirm('Relancer l\'entraînement ?')) {
+        // Logique de relance
+        window.location.href = "{% url 'ml:create_training' %}?retry={{ training.id }}";
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,423 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ expert.user.get_full_name|default:expert.user.username }} - RegAnnotator{% endblock %}
+{% block page_title %}Profil Expert{% endblock %}
+
+{% block content %}
+<!-- En-tête du profil -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <div class="d-flex align-items-start">
+                <div class="me-4">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                         style="width: 80px; height: 80px; font-size: 2rem;">
+                        {{ expert.user.first_name.0|default:expert.user.username.0|upper }}
+                    </div>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h3 class="mb-1">{{ expert.user.get_full_name|default:expert.user.username }}</h3>
+                            <p class="text-muted mb-2">
+                                {% if expert.position and expert.company %}
+                                    {{ expert.position }} chez {{ expert.company }}
+                                {% elif expert.company %}
+                                    {{ expert.company }}
+                                {% elif expert.position %}
+                                    {{ expert.position }}
+                                {% else %}
+                                    Expert Pharmaceutique
+                                {% endif %}
+                            </p>
+                            <div class="mb-2">
+                                <span class="badge bg-{% if expert.expertise_level == 'expert' %}danger{% elif expert.expertise_level == 'senior' %}success{% elif expert.expertise_level == 'confirmed' %}info{% else %}warning{% endif %} me-2">
+                                    {{ expert.get_expertise_level_display }}
+                                </span>
+                                <span class="badge bg-{{ expert.is_active|yesno:'success,secondary' }}">
+                                    {{ expert.is_active|yesno:'Actif,Inactif' }}
+                                </span>
+                                <span class="badge bg-info ms-2">{{ expert.years_experience }} ans d'expérience</span>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="fas fa-envelope"></i> {{ expert.user.email }}
+                                {% if expert.last_activity %}
+                                    <span class="mx-2">•</span>
+                                    <i class="fas fa-clock"></i> Dernière activité: {{ expert.last_activity|timesince }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <div class="btn-group">
+                                <a href="{% url 'experts:expert_tasks' expert.id %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-tasks"></i> Tâches
+                                </a>
+                                <a href="{% url 'experts:expert_analytics' expert.id %}" class="btn btn-outline-success">
+                                    <i class="fas fa-chart-bar"></i> Analytics
+                                </a>
+                                <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#assignTaskModal">
+                                    <i class="fas fa-plus"></i> Assigner Tâche
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h6 class="mb-3 text-center">Performance Globale</h6>
+            <div class="text-center">
+                <div class="display-6 text-success mb-2">{{ expert.accuracy_score|floatformat:0 }}%</div>
+                <p class="text-muted mb-3">Score de Précision</p>
+                <div class="progress mb-2" style="height: 8px;">
+                    <div class="progress-bar bg-success" style="width: {{ expert.accuracy_score }}%"></div>
+                </div>
+                <small class="text-muted">Basé sur {{ expert.total_annotations_validated }} validations</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Métriques de performance -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-primary">{{ expert.total_annotations_validated }}</div>
+            <h6 class="text-muted">Annotations Validées</h6>
+            <div class="mt-2">
+                <i class="fas fa-check-circle fa-2x text-primary"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-success">{{ expert.total_feedbacks_given }}</div>
+            <h6 class="text-muted">Feedbacks Donnés</h6>
+            <div class="mt-2">
+                <i class="fas fa-comments fa-2x text-success"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-warning">{{ expert.validation_rate|floatformat:0 }}%</div>
+            <h6 class="text-muted">Taux de Validation</h6>
+            <div class="mt-2">
+                <i class="fas fa-percentage fa-2x text-warning"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-info">{{ expert.average_validation_time|floatformat:0 }}s</div>
+            <h6 class="text-muted">Temps Moyen</h6>
+            <div class="mt-2">
+                <i class="fas fa-stopwatch fa-2x text-info"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Spécialités et informations détaillées -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h6 class="mb-3">🎯 Spécialités et Expertise</h6>
+            
+            {% if specialties %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Entité</th>
+                                <th>Niveau</th>
+                                <th>Annotations</th>
+                                <th>Taux Succès</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for specialty in specialties %}
+                            <tr>
+                                <td>
+                                    <span class="badge" style="background-color: {{ specialty.entity_type.color }};">
+                                        {{ specialty.entity_type.name }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% for i in "12345" %}
+                                            <i class="fas fa-star {% if specialty.proficiency_level >= i|add:0 %}text-warning{% else %}text-muted{% endif %}"></i>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td>{{ specialty.annotations_count }}</td>
+                                <td>
+                                    <span class="badge bg-{% if specialty.success_rate >= 90 %}success{% elif specialty.success_rate >= 75 %}warning{% else %}danger{% endif %}">
+                                        {{ specialty.success_rate|floatformat:0 }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-star fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">Aucune spécialité définie</p>
+                    <button class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-plus"></i> Ajouter Spécialité
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h6 class="mb-3">📋 Informations Professionnelles</h6>
+            <table class="table table-sm table-borderless">
+                <tr>
+                    <td><strong>Nom d'utilisateur:</strong></td>
+                    <td>{{ expert.user.username }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Email:</strong></td>
+                    <td>{{ expert.user.email }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Niveau d'expertise:</strong></td>
+                    <td>{{ expert.get_expertise_level_display }}</td>
+                </tr>
+                {% if expert.company %}
+                <tr>
+                    <td><strong>Entreprise:</strong></td>
+                    <td>{{ expert.company }}</td>
+                </tr>
+                {% endif %}
+                {% if expert.position %}
+                <tr>
+                    <td><strong>Poste:</strong></td>
+                    <td>{{ expert.position }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td><strong>Expérience:</strong></td>
+                    <td>{{ expert.years_experience }} années</td>
+                </tr>
+                <tr>
+                    <td><strong>Vitesse d'annotation:</strong></td>
+                    <td>{{ expert.get_annotation_speed_display|default:"Non définie" }}</td>
+                </tr>
+                <tr>
+                    <td><strong>Membre depuis:</strong></td>
+                    <td>{{ expert.created_at|date:"d/m/Y" }}</td>
+                </tr>
+            </table>
+            
+            {% if expert.certifications %}
+                <hr>
+                <h6>🎓 Certifications</h6>
+                <p class="small">{{ expert.certifications }}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Activités récentes -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h6 class="mb-3">✅ Validations Récentes</h6>
+            {% if recent_validations %}
+                <div class="list-group list-group-flush">
+                    {% for validation in recent_validations %}
+                        <div class="list-group-item border-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <span class="badge me-2" style="background-color: {{ validation.entity_type.color }};">
+                                        {{ validation.entity_type.name }}
+                                    </span>
+                                    <strong>"{{ validation.text_value|truncatechars:30 }}"</strong>
+                                    <br><small class="text-muted">
+                                        {{ validation.sentence.document.title|truncatechars:40 }}
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-muted">{{ validation.validated_at|date:"d/m H:i" }}</small>
+                                    <br><span class="badge bg-{{ validation.validation_status|yesno:'success,warning,danger' }}">
+                                        {{ validation.get_validation_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-check-circle fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">Aucune validation récente</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h6 class="mb-3">💬 Feedbacks Récents</h6>
+            {% if recent_feedbacks %}
+                <div class="list-group list-group-flush">
+                    {% for feedback in recent_feedbacks %}
+                        <div class="list-group-item border-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <span class="badge bg-{{ feedback.feedback_type|yesno:'warning,info,success' }} me-2">
+                                        {{ feedback.get_feedback_type_display }}
+                                    </span>
+                                    <p class="mb-1 small">{{ feedback.comment|truncatechars:60 }}</p>
+                                    <small class="text-muted">
+                                        Annotation: "{{ feedback.annotation.text_value|truncatechars:20 }}"
+                                    </small>
+                                </div>
+                                <small class="text-muted">{{ feedback.created_at|date:"d/m H:i" }}</small>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-comments fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">Aucun feedback récent</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Tâches assignées -->
+{% if tasks %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6>📋 Tâches Assignées</h6>
+                <a href="{% url 'experts:expert_tasks' expert.id %}" class="btn btn-sm btn-outline-primary">
+                    Voir toutes les tâches
+                </a>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Titre</th>
+                            <th>Type</th>
+                            <th>Priorité</th>
+                            <th>Statut</th>
+                            <th>Créée le</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td>
+                                <strong>{{ task.title }}</strong>
+                                <br><small class="text-muted">{{ task.description|truncatechars:50 }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ task.get_task_type_display }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if task.priority == 'urgent' %}danger{% elif task.priority == 'high' %}warning{% else %}secondary{% endif %}">
+                                    {{ task.get_priority_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if task.status == 'completed' %}success{% elif task.status == 'in_progress' %}primary{% elif task.status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                    {{ task.get_status_display }}
+                                </span>
+                            </td>
+                            <td>{{ task.created_at|date:"d/m/Y" }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" title="Voir détails">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    {% if task.document %}
+                                        <a href="{% url 'dashboard:document_detail' task.document.id %}" 
+                                           class="btn btn-outline-secondary" title="Voir document">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal assigner tâche -->
+<div class="modal fade" id="assignTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assigner une Tâche</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'experts:assign_task' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="expert_id" value="{{ expert.id }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Type de tâche</label>
+                        <select class="form-select" name="task_type" required>
+                            <option value="validation">Validation d'annotations</option>
+                            <option value="review">Révision de document</option>
+                            <option value="training">Formation de modèle</option>
+                            <option value="quality_check">Contrôle qualité</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Titre</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Priorité</label>
+                        <select class="form-select" name="priority">
+                            <option value="normal">Normale</option>
+                            <option value="high">Haute</option>
+                            <option value="urgent">Urgente</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Assigner la Tâche
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

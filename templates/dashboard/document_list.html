@@ -1,0 +1,669 @@
+{% extends 'base.html' %}
+
+{% block title %}Documents - RegAnnotator{% endblock %}
+{% block page_title %}Gestion des Documents avec Extraction Automatique{% endblock %}
+
+{% block content %}
+<!-- Actions et filtres -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Tous les statuts</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="language" class="form-select">
+                        <option value="">Toutes les langues</option>
+                        {% for value, label in language_choices %}
+                            <option value="{{ value }}" {% if language_filter == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="source" class="form-select">
+                        <option value="">Toutes les sources</option>
+                        {% for value, label in source_choices %}
+                            <option value="{{ value }}" {% if source_filter == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Filtrer
+                    </button>
+                    <a href="{% url 'dashboard:document_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card text-center">
+            <div class="btn-group">
+                <a href="{% url 'documents:upload' %}" class="btn btn-success">
+                    <i class="fas fa-plus"></i> Nouveau Document
+                </a>
+{#                 Optionnel : Upload en lot (décommenter quand prêt)#}
+                <a href="{% url 'documents:bulk_upload' %}" class="btn btn-outline-success">
+                    <i class="fas fa-upload"></i> Upload en lot
+                </a>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistiques d'extraction corrigées -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="stat-number text-primary">{{ stats.total_documents }}</div>
+            <div class="stat-label">Documents totaux</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="stat-number text-success">{{ stats.with_extracted_title }}</div>
+            <div class="stat-label">Avec titre extrait</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="stat-number text-info">{{ stats.with_detected_language }}</div>
+            <div class="stat-label">Langue détectée</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="stat-number text-warning">{{ stats.with_identified_source }}</div>
+            <div class="stat-label">Source identifiée</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="stat-number text-secondary">{{ stats.with_logs }}</div>
+            <div class="stat-label">Avec logs</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <a href="{% url 'documents:extraction_logs' %}" class="text-decoration-none">
+                <div class="stat-number text-dark">
+                    <i class="fas fa-history fa-2x"></i>
+                </div>
+                <div class="stat-label">Voir tous les logs</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des documents -->
+<div class="stat-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">📄 Documents ({{ stats.total_documents }})</h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary" onclick="toggleExtractionView()">
+                <i class="fas fa-robot"></i> Vue extraction
+            </button>
+            <button class="btn btn-outline-secondary" onclick="exportDocuments()">
+                <i class="fas fa-download"></i> Exporter
+            </button>
+            <a href="{% url 'documents:extraction_logs' %}" class="btn btn-outline-info" title="Voir tous les logs d'extraction">
+                <i class="fas fa-history"></i> Logs
+            </a>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-hover" id="documentsTable">
+            <thead>
+                <tr>
+                    <th>Titre</th>
+                    <th>Date</th>
+                    <th>Langue</th>
+                    <th>Pays</th>
+                    <th>Source</th>
+                    <th>Version</th>
+                    <th>Type</th>
+                    <th>Statut</th>
+                    <th>Extraction</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for document in page_obj %}
+                <tr>
+                    <td>
+                        <div class="document-title">
+                            <strong>{{ document.effective_title|default:document.title|truncatechars:50 }}</strong>
+                            {% if document.auto_extracted_title and not document.title_manually_edited %}
+                                <span class="badge bg-success ms-1" title="Titre extrait automatiquement">
+                                    <i class="fas fa-robot"></i>
+                                </span>
+                            {% elif document.title_manually_edited %}
+                                <span class="badge bg-warning ms-1" title="Titre modifié manuellement">
+                                    <i class="fas fa-user-edit"></i>
+                                </span>
+                            {% endif %}
+                        </div>
+                        {% if document.file_size_mb %}
+                            <small class="text-muted">{{ document.file_size_mb|floatformat:1 }} MB</small>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+    {% if document.effective_date %}
+        <div class="fw-bold">
+            {{ document.effective_date|date:"d/m/Y" }}
+        </div>
+        {% if document.publication_date and document.date_manually_edited %}
+            <small class="text-warning">
+                <i class="fas fa-user-edit"></i> Modifié
+            </small>
+        {% elif document.auto_extracted_date and not document.date_manually_edited %}
+            <small class="text-success">
+                <i class="fas fa-robot"></i> Auto-extrait
+            </small>
+        {% endif %}
+    {% else %}
+        <span class="text-muted">Non renseignée</span>
+    {% endif %}
+</td>
+
+                    <td>
+                        {% if document.effective_language|default:document.language %}
+                            <span class="badge bg-info">{{ document.effective_language|default:document.language|upper }}</span>
+                            {% if document.auto_extracted_language and document.language == 'auto' %}
+                                <br><small class="text-success">
+                                    <i class="fas fa-robot"></i> Détectée
+                                </small>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">Non détectée</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        {% if document.auto_extracted_country %}
+                            <div class="fw-bold">{{ document.auto_extracted_country }}</div>
+                            <small class="text-success">
+                                <i class="fas fa-robot"></i> Auto-identifié
+                            </small>
+                        {% else %}
+                            <span class="text-muted">Non identifié</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        {% if document.source %}
+                            <span class="badge bg-primary">{{ document.source.acronym }}</span>
+                            <div class="small">{{ document.source.name|truncatechars:20 }}</div>
+                        {% elif document.auto_extracted_source %}
+                            <span class="badge bg-success">{{ document.auto_extracted_source }}</span>
+                            <small class="text-success">
+                                <i class="fas fa-robot"></i> Auto-identifiée
+                            </small>
+                        {% else %}
+                            <span class="text-muted">Non identifiée</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        {% if document.version %}
+                            <span class="badge bg-secondary">{{ document.version }}</span>
+                        {% elif document.auto_extracted_version %}
+                            <span class="badge bg-success">{{ document.auto_extracted_version }}</span>
+                            <small class="text-success">
+                                <i class="fas fa-robot"></i> Extraite
+                            </small>
+                        {% else %}
+                            <span class="text-muted">N/A</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <span class="badge bg-light text-dark">{{ document.get_document_type_display }}</span>
+                    </td>
+                    
+                    <td>
+                        <span class="badge bg-{% if document.status == 'metadata_extracted' %}success{% elif document.status == 'processing' %}warning{% elif document.status == 'error' %}danger{% else %}secondary{% endif %}">
+                            {{ document.get_status_display }}
+                        </span>
+                    </td>
+                    
+                    <td>
+                        {% if document.extraction_confidence %}
+                            {% with avg_confidence=document.extraction_summary.confidence_avg %}
+                                <div class="extraction-quality">
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar {% if avg_confidence >= 80 %}bg-success{% elif avg_confidence >= 60 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                             style="width: {{ avg_confidence }}%" title="{{ avg_confidence|floatformat:0 }}% de confiance"></div>
+                                    </div>
+                                    <small class="text-muted">{{ avg_confidence|floatformat:0 }}%</small>
+                                </div>
+                            {% endwith %}
+                        {% else %}
+                            <span class="text-muted">Non traité</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'dashboard:document_detail' document.id %}" 
+                               class="btn btn-outline-primary" title="Voir détails">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            
+                            <a href="{% url 'documents:extraction_logs' %}?document={{ document.id }}" 
+                               class="btn btn-outline-info" title="Voir logs d'extraction de ce document">
+                                <i class="fas fa-history"></i>
+                            </a>
+                            
+{#                            Optionnel : Édition des métadonnées (décommenter quand prêt)#}
+                            <a href="{% url 'documents:edit_metadata' document.id %}" 
+                               class="btn btn-outline-warning" title="Éditer métadonnées">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            
+                            
+                            {% if document.status == 'uploaded' %}
+                                <a href="{% url 'dashboard:process_document' document.id %}" 
+                                   class="btn btn-outline-success" title="Traiter avec IA">
+                                    <i class="fas fa-brain"></i>
+                                </a>
+                            {% endif %}
+                            
+                            <a href="{{ document.file.url }}" target="_blank" 
+                               class="btn btn-outline-secondary" title="Télécharger">
+                                <i class="fas fa-download"></i>
+                            </a>
+                            
+{#                             Optionnel : Analytics (décommenter quand prêt)#}
+                            <a href="{% url 'documents:analytics' document.id %}" 
+                               class="btn btn-outline-info" title="Analytics">
+                                <i class="fas fa-chart-bar"></i>
+                            </a>
+                           
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-5">
+                        <i class="fas fa-file-plus fa-3x mb-3"></i>
+                        <div class="h5">Aucun document trouvé</div>
+                        <div class="mb-3">Commencez par télécharger votre premier document</div>
+                        <a href="{% url 'documents:upload' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Nouveau Document
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <nav aria-label="Navigation des documents" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if current_status %}&status={{ current_status }}{% endif %}{% if language_filter %}&language={{ language_filter }}{% endif %}{% if source_filter %}&source={{ source_filter }}{% endif %}">Premier</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if language_filter %}&language={{ language_filter }}{% endif %}{% if source_filter %}&source={{ source_filter }}{% endif %}">Précédent</a>
+                    </li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">
+                        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if language_filter %}&language={{ language_filter }}{% endif %}{% if source_filter %}&source={{ source_filter }}{% endif %}">Suivant</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_status %}&status={{ current_status }}{% endif %}{% if language_filter %}&language={{ language_filter }}{% endif %}{% if source_filter %}&source={{ source_filter }}{% endif %}">Dernier</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+
+<!-- Légende des indicateurs -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="stat-card bg-light">
+            <h6 class="mb-3">🔍 Légende des Indicateurs d'Extraction</h6>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-success me-2"><i class="fas fa-robot"></i></span>
+                        <small>Extrait automatiquement</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-warning me-2"><i class="fas fa-user-edit"></i></span>
+                        <small>Modifié manuellement</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="progress me-2" style="width: 30px; height: 8px;">
+                            <div class="progress-bar bg-success" style="width: 80%"></div>
+                        </div>
+                        <small>Qualité d'extraction</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="text-muted me-2">N/A</span>
+                        <small>Non détecté/renseigné</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'upload (version simplifiée) -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-upload"></i> Nouveau Document avec Extraction Automatique
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data" action="{% url 'documents:upload' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-magic"></i>
+                        <strong>Extraction automatique activée :</strong> Le titre, la date, la langue, le pays, la source et la version seront détectés automatiquement.
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="title" class="form-label">
+                                    Titre du document 
+                                    <small class="text-muted">(optionnel)</small>
+                                </label>
+                                <input type="text" class="form-control" id="title" name="title" 
+                                       placeholder="Sera extrait automatiquement si vide">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="file" class="form-label">Fichier</label>
+                                <input type="file" class="form-control" id="file" name="file" 
+                                       accept=".pdf,.doc,.docx,.txt,.html,.htm,.rtf,.odt" required>
+                                <div class="form-text">Formats : PDF, DOC, DOCX, TXT, HTML, RTF, ODT</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="document_type" class="form-label">
+                                    Type de document 
+                                    <small class="text-muted">(auto-détecté)</small>
+                                </label>
+                                <select class="form-select" id="document_type" name="document_type">
+                                    <option value="">Auto-détection</option>
+                                    <option value="guideline">Guideline</option>
+                                    <option value="procedure">Procédure</option>
+                                    <option value="variation">Variation</option>
+                                    <option value="regulation">Règlement</option>
+                                    <option value="directive">Directive</option>
+                                    <option value="circular">Circulaire</option>
+                                    <option value="notice">Notice</option>
+                                    <option value="report">Rapport</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="language" class="form-label">
+                                    Langue 
+                                    <small class="text-muted">(auto-détectée)</small>
+                                </label>
+                                <select class="form-select" id="language" name="language">
+                                    <option value="auto" selected>Détection automatique</option>
+                                    <option value="fr">Français</option>
+                                    <option value="en">Anglais</option>
+                                    <option value="de">Allemand</option>
+                                    <option value="es">Espagnol</option>
+                                    <option value="it">Italien</option>
+                                    <option value="pt">Portugais</option>
+                                    <option value="nl">Néerlandais</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="version" class="form-label">
+                                    Version 
+                                    <small class="text-muted">(optionnel)</small>
+                                </label>
+                                <input type="text" class="form-control" id="version" name="version" 
+                                       placeholder="Sera extraite automatiquement">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="url_source" class="form-label">URL source (optionnel)</label>
+                                <input type="url" class="form-control" id="url_source" name="url_source" 
+                                       placeholder="https://...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-magic"></i> Télécharger et Extraire
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.document-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.extraction-quality {
+    min-width: 60px;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.badge {
+    font-size: 0.7em;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.table .btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Style spécial pour le bouton logs */
+.btn-outline-info .fa-history {
+    color: #17a2b8;
+}
+
+.btn-outline-info:hover .fa-history {
+    color: white;
+}
+
+/* Animation pour l'icône d'historique */
+.fa-history {
+    transition: transform 0.2s ease;
+}
+
+.btn:hover .fa-history {
+    transform: rotate(15deg);
+}
+
+/* Mode vue extraction */
+.extraction-view .table th:nth-child(7),
+.extraction-view .table th:nth-child(8),
+.extraction-view .table td:nth-child(7),
+.extraction-view .table td:nth-child(8) {
+    display: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+    
+    .badge {
+        font-size: 0.6em;
+    }
+    
+    .btn-group-sm .btn {
+        padding: 0.2rem 0.4rem;
+    }
+    
+    /* Masquer certains boutons sur mobile pour économiser l'espace */
+    @media (max-width: 576px) {
+        .btn-group .btn:not(.btn-outline-primary):not(.btn-outline-info) {
+            display: none;
+        }
+    }
+}
+
+/* Style pour la carte de logs dans les statistiques */
+.stat-card a:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Animation CSS */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleExtractionView() {
+    const table = document.getElementById('documentsTable');
+    table.classList.toggle('extraction-view');
+    
+    const btn = event.target.closest('button');
+    if (table.classList.contains('extraction-view')) {
+        btn.innerHTML = '<i class="fas fa-table"></i> Vue normale';
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-primary');
+    } else {
+        btn.innerHTML = '<i class="fas fa-robot"></i> Vue extraction';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    }
+}
+
+function exportDocuments() {
+    // Récupérer les paramètres de filtrage actuels
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    
+    // Créer l'URL d'export avec tous les filtres
+    const exportUrl = `/dashboard/documents/export/?${params.toString()}`;
+    
+    // Télécharger le fichier
+    window.open(exportUrl, '_blank');
+}
+
+// Animation des badges d'extraction
+document.addEventListener('DOMContentLoaded', function() {
+    const extractionBadges = document.querySelectorAll('.badge .fa-robot');
+    
+    extractionBadges.forEach(badge => {
+        badge.style.animation = 'pulse 2s infinite';
+    });
+    
+    // Ajouter des tooltips pour les boutons de logs
+    const logButtons = document.querySelectorAll('a[href*="extraction_logs"]');
+    logButtons.forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.setAttribute('data-bs-toggle', 'tooltip');
+            this.setAttribute('data-bs-placement', 'top');
+            if (this.href.includes('?document=')) {
+                this.setAttribute('title', 'Voir les logs d\'extraction de ce document');
+            } else {
+                this.setAttribute('title', 'Voir tous les logs d\'extraction du système');
+            }
+        });
+    });
+});
+
+// Tooltips pour les indicateurs de qualité
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBars = document.querySelectorAll('.progress-bar');
+    
+    progressBars.forEach(bar => {
+        const confidence = bar.style.width.replace('%', '');
+        let quality = 'Faible';
+        
+        if (confidence >= 80) quality = 'Excellente';
+        else if (confidence >= 60) quality = 'Bonne';
+        else if (confidence >= 40) quality = 'Moyenne';
+        
+        bar.title = `Qualité d'extraction: ${quality} (${confidence}%)`;
+    });
+});
+
+// Actualisation automatique des statistiques
+setInterval(function() {
+    // Optionnel: recharger les statistiques via AJAX
+    console.log('Actualisation des statistiques...');
+}, 300000); // 5 minutes
+</script>
+{% endblock %}

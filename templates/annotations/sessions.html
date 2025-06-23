@@ -1,0 +1,420 @@
+{% extends 'base.html' %}
+
+{% block title %}Sessions d'Annotation - RegAnnotator{% endblock %}
+{% block page_title %}Sessions d'Annotation IA{% endblock %}
+
+{% block content %}
+<!-- Statistiques des sessions -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-primary">{{ page_obj.paginator.count }}</div>
+            <h6 class="text-muted">Total Sessions</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-success">
+                {% with running=page_obj.object_list|dictsort:"status"|dictsort:"running"|length %}{{ running }}{% endwith %}
+            </div>
+            <h6 class="text-muted">En Cours</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-info">
+                {% with completed=page_obj.object_list|dictsort:"status"|dictsort:"completed"|length %}{{ completed }}{% endwith %}
+            </div>
+            <h6 class="text-muted">Terminées</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#newSessionModal">
+                <i class="fas fa-plus"></i> Nouvelle Session
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Tous les statuts</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <input type="text" name="document" class="form-control" 
+                           placeholder="Rechercher par document..." value="{{ request.GET.document }}">
+                </div>
+                <div class="col-md-3">
+                    <input type="date" name="date_from" class="form-control" 
+                           value="{{ request.GET.date_from }}" title="Date de début">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Filtrer
+                    </button>
+                    <a href="{% url 'annotations:sessions' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-around">
+                <button class="btn btn-outline-warning btn-sm" onclick="pauseAllRunning()">
+                    <i class="fas fa-pause"></i> Pause Tout
+                </button>
+                <button class="btn btn-outline-danger btn-sm" onclick="stopAllRunning()">
+                    <i class="fas fa-stop"></i> Arrêter Tout
+                </button>
+                <button class="btn btn-outline-info btn-sm" onclick="exportSessions()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des sessions -->
+<div class="stat-card">
+    <h5 class="mb-3">Sessions d'Annotation</h5>
+    
+    {% if page_obj %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Modèle IA</th>
+                        <th>Statut</th>
+                        <th>Progression</th>
+                        <th>Créée par</th>
+                        <th>Date</th>
+                        <th>Durée</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for session in page_obj %}
+                    <tr class="session-row" data-session-id="{{ session.id }}">
+                        <td>
+                            <div>
+                                <strong>{{ session.document.title|truncatechars:40 }}</strong>
+                                <br><small class="text-muted">
+                                    {{ session.document.source.acronym }} • 
+                                    {{ session.document.get_document_type_display }}
+                                </small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ session.llm_model }}</span>
+                            {% if session.parameters %}
+                                <br><small class="text-muted">Paramètres personnalisés</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if session.status == 'running' %}warning{% elif session.status == 'completed' %}success{% else %}danger{% endif %}">
+                                {{ session.get_status_display }}
+                            </span>
+                            {% if session.status == 'running' %}
+                                <div class="spinner-border spinner-border-sm text-warning ms-2" role="status">
+                                    <span class="visually-hidden">En cours...</span>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% with total_sentences=session.total_sentences %}
+
+                            {% with processed_sentences=session.processed_sentences %}
+
+                                {% if total_sentences > 0 %}
+                                    {% widthratio processed_sentences total_sentences 100 as progress %}
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-{% if progress == 100 %}success{% elif progress > 50 %}info{% else %}warning{% endif %}" 
+                                             style="width: {{ progress }}%" role="progressbar"></div>
+                                    </div>
+                                    <small class="text-muted">{{ processed_sentences }}/{{ total_sentences }} ({{ progress }}%)</small>
+                                {% else %}
+                                    <small class="text-muted">Aucune phrase</small>
+                                {% endif %}
+                            {% endwith %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-user text-primary me-2"></i>
+                                <div>
+                                    <strong>{{ session.created_by.username|default:"Système" }}</strong>
+                                    <br><small class="text-muted">{{ session.created_by.get_full_name|default:"Automatique" }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                {{ session.created_at|date:"d/m/Y" }}
+                                <br><small class="text-muted">{{ session.created_at|time:"H:i" }}</small>
+                            </div>
+                        </td>
+                        <td>
+    {% if session.status == 'completed' and session.duration %}
+        <small class="text-muted">
+            {% if session.duration.total_seconds < 60 %}
+                {{ session.duration.total_seconds|floatformat:0 }}s
+            {% elif session.duration.total_seconds < 3600 %}
+                {{ session.duration.total_seconds|divisibleby:60|yesno:"1,0"|floatformat:0 }}min
+            {% else %}
+                {{ session.duration.total_seconds|divisibleby:3600|yesno:"1,0"|floatformat:1 }}h
+            {% endif %}
+        </small>
+    {% elif session.status == 'running' %}
+        <small class="text-warning">En cours...</small>
+    {% else %}
+        <small class="text-muted">-</small>
+    {% endif %}
+</td>
+
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'annotations:session_detail' session.id %}" 
+                                   class="btn btn-outline-primary" title="Voir détails">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'dashboard:document_detail' session.document.id %}" 
+                                   class="btn btn-outline-secondary" title="Voir document">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                {% if session.status == 'running' %}
+                                    <button class="btn btn-outline-warning" 
+                                            onclick="pauseSession('{{ session.id }}')" title="Pause">
+                                        <i class="fas fa-pause"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" 
+                                            onclick="stopSession('{{ session.id }}')" title="Arrêter">
+                                        <i class="fas fa-stop"></i>
+                                    </button>
+                                {% elif session.status == 'failed' %}
+                                    <button class="btn btn-outline-success" 
+                                            onclick="retrySession('{{ session.id }}')" title="Relancer">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <nav aria-label="Navigation des sessions" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if current_status %}&status={{ current_status }}{% endif %}">Premier</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">Précédent</a>
+                        </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">Suivant</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_status %}&status={{ current_status }}{% endif %}">Dernier</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+            <h6 class="text-muted">Aucune session d'annotation</h6>
+            <p class="text-muted">Créez votre première session pour commencer l'annotation automatique.</p>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newSessionModal">
+                <i class="fas fa-plus"></i> Créer une Session
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal nouvelle session -->
+<div class="modal fade" id="newSessionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouvelle Session d'Annotation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'annotations:create_session' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Document à traiter <span class="text-danger">*</span></label>
+                        <select class="form-select" name="document_id" required>
+                            <option value="">Choisir un document...</option>
+                            {% comment %}
+                            <!-- Cette liste devrait être passée depuis la vue -->
+                            {% for doc in available_documents %}
+                                <option value="{{ doc.id }}">
+                                    {{ doc.title }} ({{ doc.source.acronym }})
+                                </option>
+                            {% endfor %}
+                            {% endcomment %}
+                        </select>
+                        <div class="form-text">Seuls les documents non traités sont affichés</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Modèle IA</label>
+                        <select class="form-select" name="llm_model">
+                            <option value="mistral-7b-instruct">Mistral 7B Instruct (Recommandé)</option>
+                            <option value="mistral-8x7b">Mistral 8x7B (Plus précis)</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            <option value="gpt-4">GPT-4 (Premium)</option>
+                        </select>
+                        <div class="form-text">Le modèle détermine la qualité et la vitesse d'annotation</div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Information :</strong> Le traitement peut prendre plusieurs minutes selon la taille du document.
+                        Vous recevrez une notification une fois terminé.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-play"></i> Démarrer l'Annotation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Actualisation automatique pour les sessions en cours
+let refreshInterval;
+
+function startAutoRefresh() {
+    refreshInterval = setInterval(() => {
+        const runningSessions = document.querySelectorAll('.badge.bg-warning');
+        if (runningSessions.length > 0) {
+            location.reload();
+        } else {
+            stopAutoRefresh();
+        }
+    }, 30000); // Actualiser toutes les 30 secondes
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+}
+
+// Démarrer l'actualisation si des sessions sont en cours
+document.addEventListener('DOMContentLoaded', function() {
+    const runningSessions = document.querySelectorAll('.badge.bg-warning');
+    if (runningSessions.length > 0) {
+        startAutoRefresh();
+    }
+});
+
+function pauseSession(sessionId) {
+    if (confirm('Mettre en pause cette session ?')) {
+        fetch(`/api/sessions/${sessionId}/pause/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            }
+        });
+    }
+}
+
+function stopSession(sessionId) {
+    if (confirm('Arrêter définitivement cette session ?')) {
+        fetch(`/api/sessions/${sessionId}/stop/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            }
+        });
+    }
+}
+
+function retrySession(sessionId) {
+    if (confirm('Relancer cette session échouée ?')) {
+        fetch(`/api/sessions/${sessionId}/retry/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            }
+        });
+    }
+}
+
+function pauseAllRunning() {
+    if (confirm('Mettre en pause toutes les sessions en cours ?')) {
+        // Implémenter l'action en lot
+        alert('Fonctionnalité à implémenter');
+    }
+}
+
+function stopAllRunning() {
+    if (confirm('Arrêter toutes les sessions en cours ?')) {
+        // Implémenter l'action en lot
+        alert('Fonctionnalité à implémenter');
+    }
+}
+
+function exportSessions() {
+    window.open('/export/sessions/?format=csv');
+}
+</script>
+{% endblock %}

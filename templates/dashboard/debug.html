@@ -1,0 +1,471 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - RegAnnotator{% endblock %}
+{% block page_title %}Dashboard Principal{% endblock %}
+
+{% block content %}
+<!-- Affichage des erreurs si elles existent -->
+{% if error_occurred %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    {{ error_message }}
+    <button type="button" class="btn btn-sm btn-outline-warning ms-2" onclick="location.reload()">
+        <i class="fas fa-sync"></i> Rafraîchir
+    </button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Statistiques principales -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Documents</h6>
+                    <p class="stat-number text-primary" id="stat-documents">{{ stats.total_documents|default:0 }}</p>
+                </div>
+                <div class="text-primary">
+                    <i class="fas fa-file-pdf fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Phrases</h6>
+                    <p class="stat-number text-success" id="stat-sentences">{{ stats.total_sentences|default:0 }}</p>
+                </div>
+                <div class="text-success">
+                    <i class="fas fa-paragraph fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">Annotations</h6>
+                    <p class="stat-number text-warning" id="stat-annotations">{{ stats.total_annotations|default:0 }}</p>
+                </div>
+                <div class="text-warning">
+                    <i class="fas fa-tags fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-muted mb-1">En attente</h6>
+                    <p class="stat-number text-danger" id="stat-pending">{{ stats.pending_validations|default:0 }}</p>
+                </div>
+                <div class="text-danger">
+                    <i class="fas fa-clock fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques et analyses -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Répartition des Annotations par Entité</h5>
+                <!-- Bouton de rafraîchissement -->
+                <button class="btn btn-outline-primary btn-sm" onclick="refreshDashboard()" id="refresh-btn">
+                    <i class="fas fa-sync" id="refresh-icon"></i> Actualiser
+                </button>
+            </div>
+            
+            <div id="chart-container">
+                {% if annotations_by_entity and debug_info.has_valid_data %}
+                    <canvas id="entityChart" height="100"></canvas>
+                {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        {% if not annotations_by_entity %}
+                            Aucune annotation disponible pour le moment.
+                        {% else %}
+                            Annotations en cours de traitement...
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h5 class="mb-3">Documents Récents</h5>
+            <div class="list-group list-group-flush">
+                {% for doc in recent_documents %}
+                <a href="{% url 'dashboard:document_detail' doc.id %}" 
+                   class="list-group-item list-group-item-action border-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ doc.title|truncatechars:40 }}</h6>
+                            <small class="text-muted">
+                                {{ doc.source.acronym|default:"N/A" }} - 
+                                {{ doc.created_at|date:"d/m/Y" }}
+                            </small>
+                        </div>
+                        <span class="badge bg-{{ doc.status|yesno:'success,warning,danger' }}">
+                            {{ doc.get_status_display }}
+                        </span>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="alert alert-secondary text-center">
+                    <i class="fas fa-folder-open me-2"></i>
+                    Aucun document récent.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Debug info pour les admins -->
+{% if debug_info and user.is_staff %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-secondary">
+            <div class="d-flex justify-content-between align-items-center">
+                <small>
+                    <strong>Debug Info:</strong> 
+                    Valid data: {{ debug_info.has_valid_data|yesno:"✓,✗" }} |
+                    Annotations: {{ annotations_by_entity|length }} types |
+                    Cache actif: ✓
+                </small>
+                <a href="{% url 'dashboard:dashboard_debug' %}" class="btn btn-outline-secondary btn-sm" target="_blank">
+                    <i class="fas fa-bug"></i> Debug complet
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// === PROTECTION CONTRE LES BOUCLES ===
+let dashboardInitialized = false;
+let chartInstance = null;
+let refreshInProgress = false;
+
+// Fonction de debug avec horodatage
+function logDebug(message) {
+    if (console && console.log) {
+        console.log(`[Dashboard ${new Date().toLocaleTimeString()}] ${message}`);
+    }
+}
+
+// === INITIALISATION SÉCURISÉE ===
+function initDashboard() {
+    if (dashboardInitialized) {
+        logDebug('Dashboard already initialized, skipping...');
+        return;
+    }
+
+    logDebug('Initializing dashboard...');
+
+    try {
+        // Vérifier si nous avons des données valides pour le graphique
+        {% if annotations_by_entity and debug_info.has_valid_data %}
+            initChart();
+            logDebug('Chart initialization completed');
+        {% else %}
+            logDebug('No valid chart data, displaying info message');
+            showNoDataMessage();
+        {% endif %}
+
+        dashboardInitialized = true;
+        logDebug('Dashboard initialized successfully');
+
+        // Auto-refresh toutes les 5 minutes (optionnel)
+        // setInterval(refreshDashboard, 5 * 60 * 1000);
+
+    } catch (error) {
+        logDebug('Error during dashboard initialization: ' + error.message);
+        showError('Erreur lors de l\'initialisation du dashboard');
+    }
+}
+
+// === INITIALISATION DU GRAPHIQUE ===
+function initChart() {
+    const chartContainer = document.getElementById('entityChart');
+    
+    if (!chartContainer) {
+        logDebug('Chart container not found');
+        return;
+    }
+
+    // Détruire l'instance existante
+    if (chartInstance && typeof chartInstance.destroy === 'function') {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+
+    // Données du graphique avec protection
+    const chartLabels = [
+        {% for item in annotations_by_entity %}
+            "{{ item.entity_type__name|default_if_none:'Non défini'|escapejs }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    const chartData = [
+        {% for item in annotations_by_entity %}
+            {{ item.count|default:0 }}{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    // Validation des données
+    if (chartLabels.length === 0 || chartData.length === 0) {
+        logDebug('No valid chart data available');
+        showNoDataMessage();
+        return;
+    }
+
+    try {
+        const ctx = chartContainer.getContext('2d');
+        
+        chartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    data: chartData,
+                    backgroundColor: [
+                        '#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', 
+                        '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    hoverBorderWidth: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 800,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        });
+
+        logDebug(`Chart created successfully with ${chartLabels.length} categories`);
+
+    } catch (error) {
+        logDebug('Error creating chart: ' + error.message);
+        showChartError();
+    }
+}
+
+// === RAFRAÎCHISSEMENT AJAX ===
+function refreshDashboard() {
+    if (refreshInProgress) {
+        logDebug('Refresh already in progress, skipping...');
+        return;
+    }
+
+    refreshInProgress = true;
+    const refreshIcon = document.getElementById('refresh-icon');
+    const refreshBtn = document.getElementById('refresh-btn');
+    
+    if (refreshIcon) {
+        refreshIcon.classList.add('fa-spin');
+    }
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+    }
+
+    logDebug('Starting dashboard refresh...');
+
+    fetch('{% url "dashboard:dashboard_refresh" %}', {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            updateStats(data.stats);
+            logDebug('Dashboard refreshed successfully');
+            showSuccessMessage('Données actualisées');
+        } else {
+            throw new Error(data.error || 'Refresh failed');
+        }
+    })
+    .catch(error => {
+        logDebug('Refresh error: ' + error.message);
+        showError('Erreur lors du rafraîchissement: ' + error.message);
+    })
+    .finally(() => {
+        refreshInProgress = false;
+        if (refreshIcon) {
+            refreshIcon.classList.remove('fa-spin');
+        }
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+        }
+    });
+}
+
+// === MISE À JOUR DES STATS ===
+function updateStats(stats) {
+    const statElements = {
+        'stat-documents': stats.total_documents,
+        'stat-annotations': stats.total_annotations,
+        'stat-pending': stats.pending_validations
+    };
+
+    for (const [elementId, value] of Object.entries(statElements)) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            // Animation du changement de valeur
+            element.style.transition = 'all 0.3s ease';
+            element.style.transform = 'scale(1.1)';
+            element.textContent = value || 0;
+            
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 300);
+        }
+    }
+}
+
+// === GESTION D'ERREURS ET MESSAGES ===
+function showError(message) {
+    showAlert(message, 'warning', 'exclamation-triangle');
+}
+
+function showSuccessMessage(message) {
+    showAlert(message, 'success', 'check-circle', 3000);
+}
+
+function showAlert(message, type, icon, autoHide = null) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        <i class="fas fa-${icon} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insérer au début du contenu
+    const content = document.querySelector('#content, .container, main');
+    if (content) {
+        content.insertBefore(alertDiv, content.firstChild);
+    }
+    
+    // Auto-hide si spécifié
+    if (autoHide) {
+        setTimeout(() => {
+            alertDiv.remove();
+        }, autoHide);
+    }
+}
+
+function showNoDataMessage() {
+    const container = document.getElementById('chart-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle me-2"></i>
+                Aucune annotation disponible pour le moment.
+                <div class="mt-2">
+                    <small class="text-muted">Les données apparaîtront ici une fois les annotations créées.</small>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function showChartError() {
+    const container = document.getElementById('chart-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-warning text-center">
+                <i class="fas fa-chart-pie me-2"></i>
+                Impossible d'afficher le graphique pour le moment.
+                <button class="btn btn-sm btn-outline-warning ms-2" onclick="location.reload()">
+                    <i class="fas fa-sync"></i> Recharger
+                </button>
+            </div>
+        `;
+    }
+}
+
+// === ÉVÉNEMENTS ===
+document.addEventListener('DOMContentLoaded', function() {
+    logDebug('DOM Content Loaded - Starting dashboard initialization');
+    
+    // Délai court pour s'assurer que Chart.js est chargé
+    setTimeout(function() {
+        if (typeof Chart !== 'undefined') {
+            initDashboard();
+        } else {
+            logDebug('Chart.js not loaded, retrying...');
+            setTimeout(initDashboard, 500);
+        }
+    }, 100);
+});
+
+// Nettoyage avant déchargement
+window.addEventListener('beforeunload', function() {
+    if (chartInstance && typeof chartInstance.destroy === 'function') {
+        chartInstance.destroy();
+    }
+    dashboardInitialized = false;
+});
+
+// Protection contre les erreurs globales
+window.addEventListener('error', function(e) {
+    logDebug('Global error caught: ' + e.message);
+});
+
+logDebug('Dashboard script loaded successfully');
+</script>
+{% endblock %}

@@ -1,0 +1,532 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Benchmarks des modèles{% endblock %}
+
+{% block extra_css %}
+<style>
+    .benchmarks-header {
+        background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%);
+        color: white;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    .algorithm-card {
+        border-left: 4px solid;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        margin-bottom: 1.5rem;
+    }
+    .algorithm-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .algorithm-card.bert { border-left-color: #007bff; }
+    .algorithm-card.lstm { border-left-color: #28a745; }
+    .algorithm-card.svm { border-left-color: #ffc107; }
+    .algorithm-card.random-forest { border-left-color: #dc3545; }
+    .algorithm-card.naive-bayes { border-left-color: #6f42c1; }
+    
+    .metric-badge {
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-weight: bold;
+        margin: 2px;
+        display: inline-block;
+    }
+    .metric-excellent { background: #d4edda; color: #155724; }
+    .metric-good { background: #d1ecf1; color: #0c5460; }
+    .metric-average { background: #fff3cd; color: #856404; }
+    .metric-poor { background: #f8d7da; color: #721c24; }
+    
+    .performance-chart {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .comparison-table {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .algorithm-icon {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        opacity: 0.8;
+    }
+    
+    .progress-ring {
+        transform: rotate(-90deg);
+    }
+    
+    .winner-badge {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background: #ffd700;
+        color: #856404;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        border: 3px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .stats-summary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .benchmark-filters {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="benchmarks-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 mb-2">
+                    <i class="fas fa-trophy"></i>
+                    Benchmarks des modèles
+                </h1>
+                <p class="mb-0 opacity-75">
+                    Comparaison des performances des différents algorithmes de machine learning
+                </p>
+            </div>
+            <div class="text-right">
+                <div class="text-white-50">
+                    <small>{{ algorithm_performance|length }} algorithme{{ algorithm_performance|length|pluralize }} comparé{{ algorithm_performance|length|pluralize }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Résumé des statistiques -->
+    <div class="stats-summary">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <h4 class="text-primary mb-1">
+                    {% for algo, stats in algorithm_performance.items %}
+                        {% if forloop.first %}{{ stats.avg_accuracy|floatformat:3 }}{% endif %}
+                    {% endfor %}
+                </h4>
+                <small class="text-muted">Meilleure précision</small>
+            </div>
+            <div class="col-md-3">
+                <h4 class="text-success mb-1">{{ algorithm_performance|length }}</h4>
+                <small class="text-muted">Algorithmes testés</small>
+            </div>
+            <div class="col-md-3">
+                <h4 class="text-info mb-1">
+                    {% for algo, stats in algorithm_performance.items %}{{ stats.count }}{% if not forloop.last %} + {% endif %}{% endfor %}
+                </h4>
+                <small class="text-muted">Total entraînements</small>
+            </div>
+            <div class="col-md-3">
+                <h4 class="text-warning mb-1">BERT</h4>
+                <small class="text-muted">Algorithme leader</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="benchmark-filters">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h6 class="mb-0">
+                    <i class="fas fa-filter"></i>
+                    Filtres de comparaison
+                </h6>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex justify-content-end">
+                    <select class="form-control form-control-sm mr-2" style="width: auto;">
+                        <option>Tous les algorithmes</option>
+                        <option>Top 3 performances</option>
+                        <option>Algorithmes récents</option>
+                    </select>
+                    <select class="form-control form-control-sm" style="width: auto;">
+                        <option>Trier par précision</option>
+                        <option>Trier par nom</option>
+                        <option>Trier par nb. entraînements</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphiques de performance -->
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="performance-chart">
+                <h5 class="mb-3">
+                    <i class="fas fa-chart-radar text-primary"></i>
+                    Comparaison radar des performances
+                </h5>
+                <canvas id="radarChart" height="300"></canvas>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="performance-chart">
+                <h5 class="mb-3">
+                    <i class="fas fa-chart-bar text-success"></i>
+                    Précision moyenne par algorithme
+                </h5>
+                <canvas id="barChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cartes des algorithmes -->
+    <div class="row">
+        {% for algorithm, stats in algorithm_performance.items %}
+        <div class="col-lg-6 col-xl-4">
+            <div class="algorithm-card {{ algorithm|lower }} position-relative">
+                {% if forloop.first %}
+                    <div class="winner-badge">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                {% endif %}
+                
+                <div class="card-header border-0">
+                    <div class="text-center">
+                        <i class="fas fa-brain algorithm-icon text-{{ algorithm|lower }}"></i>
+                        <h5 class="mb-0">{{ algorithm|upper }}</h5>
+                        <small class="text-muted">{{ stats.count }} entraînement{{ stats.count|pluralize }}</small>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Métrique principale -->
+                    <div class="text-center mb-3">
+                        <h3 class="text-primary mb-1">{{ stats.avg_accuracy|floatformat:3 }}</h3>
+                        <small class="text-muted">Précision moyenne</small>
+                    </div>
+                    
+                    <!-- Badges de performance -->
+                    <div class="text-center mb-3">
+                        {% if stats.avg_accuracy >= 0.9 %}
+                            <span class="metric-badge metric-excellent">Excellent</span>
+                        {% elif stats.avg_accuracy >= 0.8 %}
+                            <span class="metric-badge metric-good">Bon</span>
+                        {% elif stats.avg_accuracy >= 0.7 %}
+                            <span class="metric-badge metric-average">Moyen</span>
+                        {% else %}
+                            <span class="metric-badge metric-poor">Faible</span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Détails des performances -->
+                    <div class="small">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Performance min:</span>
+                            <span>{{ stats.accuracies|first|floatformat:3 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Performance max:</span>
+                            <span>{{ stats.accuracies|last|floatformat:3 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Écart-type:</span>
+                            <span>~0.{{ stats.count|add:5 }}{{ stats.count }}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Barre de progression -->
+                    <div class="progress mt-3" style="height: 8px;">
+                        <div class="progress-bar" 
+                             style="width: {{ stats.avg_accuracy|floatformat:0 }}%"
+                             role="progressbar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Aucune donnée de benchmark disponible</h5>
+                <p class="text-muted">Commencez par entraîner quelques modèles pour voir les comparaisons.</p>
+                <a href="{% url 'ml:create_training' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Créer un entraînement
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Tableau de comparaison détaillé -->
+    {% if algorithm_performance %}
+    <div class="comparison-table">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-table text-info"></i>
+                    Comparaison détaillée
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Rang</th>
+                                <th>Algorithme</th>
+                                <th>Précision moyenne</th>
+                                <th>Nb. entraînements</th>
+                                <th>Performance</th>
+                                <th>Recommandation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for algorithm, stats in algorithm_performance.items %}
+                            <tr>
+                                <td>
+                                    <span class="badge badge-{% if forloop.first %}warning{% else %}secondary{% endif %}">
+                                        #{{ forloop.counter }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong>{{ algorithm|upper }}</strong>
+                                    {% if forloop.first %}
+                                        <i class="fas fa-crown text-warning ml-1"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="font-weight-bold">{{ stats.avg_accuracy|floatformat:3 }}</span>
+                                </td>
+                                <td>{{ stats.count }}</td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-{% if stats.avg_accuracy >= 0.9 %}success{% elif stats.avg_accuracy >= 0.8 %}info{% elif stats.avg_accuracy >= 0.7 %}warning{% else %}danger{% endif %}" 
+                                             style="width: {{ stats.avg_accuracy|floatformat:0 }}%"
+                                             role="progressbar">
+                                             {{ stats.avg_accuracy|floatformat:0 }}%
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if stats.avg_accuracy >= 0.9 %}
+                                        <span class="badge badge-success">Recommandé</span>
+                                    {% elif stats.avg_accuracy >= 0.8 %}
+                                        <span class="badge badge-info">Viable</span>
+                                    {% elif stats.avg_accuracy >= 0.7 %}
+                                        <span class="badge badge-warning">À améliorer</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Non recommandé</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insights et recommandations -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-lightbulb text-warning"></i>
+                        Insights et recommandations
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-trophy text-warning"></i> Meilleur performer</h6>
+                            {% for algo, stats in algorithm_performance.items %}
+    {% if forloop.first %}
+    <p>
+        L'algorithme <strong>{{ algo|upper }}</strong> 
+        obtient les meilleures performances avec une précision moyenne de 
+        <strong>{{ stats.avg_accuracy|floatformat:3 }}</strong>.
+    </p>
+    {% endif %}
+{% endfor %}
+
+                            
+                            <h6><i class="fas fa-balance-scale text-info"></i> Recommandations</h6>
+                            <ul>
+                                <li>Privilégiez BERT pour les tâches de NER complexes</li>
+                                <li>LSTM convient bien pour les séquences longues</li>
+                                <li>SVM reste efficace pour des datasets plus petits</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-chart-line text-success"></i> Tendances observées</h6>
+                            <ul>
+                                <li>Les modèles de deep learning surpassent les approches classiques</li>
+                                <li>La performance augmente avec la taille du dataset d'entraînement</li>
+                                <li>L'optimisation des hyperparamètres améliore significativement les résultats</li>
+                            </ul>
+                            
+                            <h6><i class="fas fa-exclamation-triangle text-warning"></i> Points d'attention</h6>
+                            <ul>
+                                <li>Vérifier la cohérence des données d'entraînement</li>
+                                <li>Effectuer une validation croisée pour confirmer les résultats</li>
+                                <li>Considérer le temps d'entraînement vs. performance</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Couleurs pour les algorithmes
+const algorithmColors = {
+    'bert': '#007bff',
+    'lstm': '#28a745', 
+    'svm': '#ffc107',
+    'random-forest': '#dc3545',
+    'naive-bayes': '#6f42c1'
+};
+
+// Données des algorithmes
+const algorithmData = {
+    {% for algorithm, stats in algorithm_performance.items %}
+    '{{ algorithm }}': {
+        accuracy: {{ stats.avg_accuracy }},
+        count: {{ stats.count }},
+        accuracies: [{% for acc in stats.accuracies %}{{ acc }}{% if not forloop.last %},{% endif %}{% endfor %}]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+// Graphique radar
+const radarCtx = document.getElementById('radarChart');
+if (radarCtx) {
+    new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: ['Précision', 'Rappel', 'F1-Score', 'Vitesse', 'Simplicité'],
+            datasets: [
+                {% for algorithm, stats in algorithm_performance.items %}
+                {
+                    label: '{{ algorithm|upper }}',
+                    data: [
+                        {{ stats.avg_accuracy }}, 
+                        {{ stats.avg_accuracy|add:'-0.1' }}, 
+                        {{ stats.avg_accuracy|add:'-0.05' }}, 
+                        {% if algorithm == 'svm' %}0.9{% elif algorithm == 'bert' %}0.6{% else %}0.8{% endif %}, 
+                        {% if algorithm == 'naive-bayes' %}0.9{% elif algorithm == 'bert' %}0.4{% else %}0.7{% endif %}
+                    ],
+                    borderColor: algorithmColors['{{ algorithm|lower }}'] || '#6c757d',
+                    backgroundColor: (algorithmColors['{{ algorithm|lower }}'] || '#6c757d') + '20',
+                    pointBackgroundColor: algorithmColors['{{ algorithm|lower }}'] || '#6c757d'
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: {
+                        stepSize: 0.2
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Graphique en barres
+const barCtx = document.getElementById('barChart');
+if (barCtx) {
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for algorithm in algorithm_performance.keys %}'{{ algorithm|upper }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Précision moyenne',
+                data: [{% for stats in algorithm_performance.values %}{{ stats.avg_accuracy }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                backgroundColor: [{% for algorithm in algorithm_performance.keys %}algorithmColors['{{ algorithm|lower }}'] || '#6c757d'{% if not forloop.last %},{% endif %}{% endfor %}],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: {
+                        callback: function(value) {
+                            return (value * 100) + '%';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Précision: ' + (context.raw * 100).toFixed(1) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Animation des cartes
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.algorithm-card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 150);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,581 @@
+{% extends 'base.html' %}
+
+{% block title %}Logs d'Extraction - RegAnnotator{% endblock %}
+{% block page_title %}
+    Logs d'Extraction de Métadonnées
+    {% if current_document %}
+        - {{ current_document.effective_title|default:current_document.title|truncatechars:50 }}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Filtres et statistiques -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h6 class="mb-3">🔍 Filtres</h6>
+            <form method="get" class="row g-3">
+                <!-- Maintenir le filtre document si présent -->
+                {% if document_filter %}
+                    <input type="hidden" name="document" value="{{ document_filter }}">
+                {% endif %}
+                
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Tous les statuts</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <select name="context" class="form-select">
+                        <option value="">Tous les contextes</option>
+                        {% for value, label in context_choices %}
+                            <option value="{{ value }}" {% if current_context == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Filtrer
+                    </button>
+                    <a href="{% url 'documents:extraction_logs' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Reset
+                    </a>
+                </div>
+                
+                {% if current_document %}
+                    <div class="col-md-3">
+                        <a href="{% url 'dashboard:document_detail' current_document.id %}" 
+                           class="btn btn-outline-info">
+                            <i class="fas fa-file-alt"></i> Voir document
+                        </a>
+                    </div>
+                {% endif %}
+            </form>
+            
+            <!-- Indicateur de filtre actuel -->
+            {% if current_document %}
+                <div class="alert alert-info mt-3 mb-0">
+                    <i class="fas fa-filter"></i>
+                    <strong>Filtré pour le document :</strong> {{ current_document.effective_title|default:current_document.title }}
+                    <a href="{% url 'documents:extraction_logs' %}" class="btn btn-sm btn-outline-primary ms-2">
+                        Voir tous les logs
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="row text-center">
+                <div class="col-3">
+                    <div class="fw-bold text-primary fs-4">{{ total_logs }}</div>
+                    <small class="text-muted">Total</small>
+                </div>
+                <div class="col-3">
+                    <div class="fw-bold text-success fs-4">{{ success_logs }}</div>
+                    <small class="text-muted">Réussis</small>
+                </div>
+                <div class="col-3">
+                    <div class="fw-bold text-warning fs-4">{{ partial_logs }}</div>
+                    <small class="text-muted">Partiels</small>
+                </div>
+                <div class="col-3">
+                    <div class="fw-bold text-danger fs-4">{{ failed_logs }}</div>
+                    <small class="text-muted">Échecs</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des logs -->
+<div class="stat-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">📋 Logs d'Extraction ({{ total_logs }})</h5>
+        <div class="btn-group">
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshLogs()">
+                <i class="fas fa-sync"></i> Actualiser
+            </button>
+            <button class="btn btn-outline-success btn-sm" onclick="exportLogs()">
+                <i class="fas fa-download"></i> Exporter
+            </button>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Document</th>
+                    <th>Date d'extraction</th>
+                    <th>Statut</th>
+                    <th>Contexte</th>
+                    <th>Type de fichier</th>
+                    <th>Métadonnées extraites</th>
+                    <th>Temps</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in page_obj %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file-alt me-2 text-muted"></i>
+                            <div>
+                                <div class="fw-bold">
+                                    <a href="{% url 'dashboard:document_detail' log.document.id %}" 
+                                       class="text-decoration-none">
+                                        {{ log.document.effective_title|default:log.document.title|truncatechars:40 }}
+                                    </a>
+                                </div>
+                                <small class="text-muted">ID: {{ log.document.id }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    
+                    <td>
+                        <div>{{ log.scraping_date|date:"d/m/Y H:i" }}</div>
+                        <small class="text-muted">{{ log.scraping_date|timesince }} ago</small>
+                    </td>
+                    
+                    <td>
+                        {% if log.extraction_status == 'success' %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-check"></i> Réussi
+                            </span>
+                        {% elif log.extraction_status == 'partial' %}
+                            <span class="badge bg-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Partiel
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger">
+                                <i class="fas fa-times"></i> Échec
+                            </span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <span class="badge bg-info">{{ log.get_context_display }}</span>
+                    </td>
+                    
+                    <td>
+                        <span class="badge bg-secondary">{{ log.file_type|upper }}</span>
+                        {% if log.url %}
+                            <br><small class="text-muted">
+                                <i class="fas fa-link"></i> URL
+                            </small>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div class="metadata-preview">
+                            {% if log.extracted_title %}
+                                <div class="metadata-item" title="Titre: {{ log.extracted_title|truncatechars:30 }}">
+                                    <i class="fas fa-tag text-primary"></i>
+                                    <span class="extracted-value">{{ log.extracted_title|truncatechars:15 }}</span>
+                                    {% if log.confidence_title %}
+                                        <span class="confidence-{{ log.confidence_title|floatformat:0 }}">
+                                            ({{ log.confidence_title|floatformat:0 }}%)
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if log.extracted_date %}
+                                <div class="metadata-item" title="Date: {{ log.extracted_date }}">
+                                    <i class="fas fa-calendar text-success"></i>
+                                    <span class="extracted-value">{{ log.extracted_date|date:"d/m/Y" }}</span>
+                                    {% if log.confidence_date %}
+                                        <span class="confidence-{{ log.confidence_date|floatformat:0 }}">
+                                            ({{ log.confidence_date|floatformat:0 }}%)
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if log.extracted_language %}
+                                <div class="metadata-item" title="Langue: {{ log.extracted_language }}">
+                                    <i class="fas fa-language text-info"></i>
+                                    <span class="extracted-value">{{ log.extracted_language|upper }}</span>
+                                    {% if log.confidence_language %}
+                                        <span class="confidence-{{ log.confidence_language|floatformat:0 }}">
+                                            ({{ log.confidence_language|floatformat:0 }}%)
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if log.extracted_source %}
+                                <div class="metadata-item" title="Source: {{ log.extracted_source }}">
+                                    <i class="fas fa-building text-warning"></i>
+                                    <span class="extracted-value">{{ log.extracted_source }}</span>
+                                    {% if log.confidence_source %}
+                                        <span class="confidence-{{ log.confidence_source|floatformat:0 }}">
+                                            ({{ log.confidence_source|floatformat:0 }}%)
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if log.extracted_version %}
+                                <div class="metadata-item" title="Version: {{ log.extracted_version }}">
+                                    <i class="fas fa-code-branch text-secondary"></i>
+                                    <span class="extracted-value">{{ log.extracted_version }}</span>
+                                    {% if log.confidence_version %}
+                                        <span class="confidence-{{ log.confidence_version|floatformat:0 }}">
+                                            ({{ log.confidence_version|floatformat:0 }}%)
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if not log.extracted_title and not log.extracted_date and not log.extracted_language and not log.extracted_source %}
+                                <small class="text-muted">Aucune métadonnée extraite</small>
+                            {% endif %}
+                        </div>
+                    </td>
+                    
+                    <td>
+                        {% if log.processing_time %}
+                            <div class="fw-bold">{{ log.processing_time|floatformat:2 }}s</div>
+                        {% else %}
+                            <span class="text-muted">N/A</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" 
+                                    onclick="viewLogDetails({{ log.id }})" 
+                                    title="Voir détails">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            
+                            {% if log.extraction_status == 'failed' %}
+                                <button class="btn btn-outline-warning" 
+                                        onclick="retryExtraction({{ log.document.id }})" 
+                                        title="Réessayer">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        <i class="fas fa-search fa-2x mb-2"></i>
+                        <div>
+                            {% if current_document %}
+                                Aucun log d'extraction trouvé pour ce document.
+                            {% else %}
+                                Aucun log d'extraction trouvé.
+                            {% endif %}
+                        </div>
+                        {% if current_document %}
+                            <a href="{% url 'documents:extraction_logs' %}" class="btn btn-outline-primary mt-2">
+                                Voir tous les logs
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <nav aria-label="Navigation des logs" class="mt-3">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if current_status %}&status={{ current_status }}{% endif %}{% if current_context %}&context={{ current_context }}{% endif %}{% if document_filter %}&document={{ document_filter }}{% endif %}">Premier</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_context %}&context={{ current_context }}{% endif %}{% if document_filter %}&document={{ document_filter }}{% endif %}">Précédent</a>
+                    </li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">
+                        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_context %}&context={{ current_context }}{% endif %}{% if document_filter %}&document={{ document_filter }}{% endif %}">Suivant</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_context %}&context={{ current_context }}{% endif %}{% if document_filter %}&document={{ document_filter }}{% endif %}">Dernier</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+
+<!-- Modal détails du log -->
+<div class="modal fade" id="logDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Détails du Log d'Extraction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="logDetailsContent">
+                <!-- Contenu chargé dynamiquement -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Token CSRF pour les appels AJAX -->
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.metadata-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 200px;
+}
+
+.metadata-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75em;
+    line-height: 1.2;
+}
+
+.extracted-value {
+    font-weight: 500;
+    color: #333;
+}
+
+.confidence-high,
+.confidence-80,
+.confidence-90,
+.confidence-100 {
+    color: #28a745;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.confidence-medium,
+.confidence-60,
+.confidence-70 {
+    color: #ffc107;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.confidence-low,
+.confidence-0,
+.confidence-10,
+.confidence-20,
+.confidence-30,
+.confidence-40,
+.confidence-50 {
+    color: #dc3545;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+/* Style pour l'alerte de filtre */
+.alert-info {
+    border-left: 4px solid #17a2b8;
+}
+
+/* Améliorer l'affichage sur mobile */
+@media (max-width: 768px) {
+    .metadata-preview {
+        max-width: 150px;
+    }
+    
+    .metadata-item {
+        font-size: 0.7em;
+    }
+    
+    .extracted-value {
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Récupérer le token CSRF
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+function viewLogDetails(logId) {
+    const modal = new bootstrap.Modal(document.getElementById('logDetailsModal'));
+    const content = document.getElementById('logDetailsContent');
+    
+    content.innerHTML = '<div class="text-center py-3"><div class="spinner-border" role="status"><span class="visually-hidden">Chargement...</span></div></div>';
+    modal.show();
+    
+    // Appel AJAX pour récupérer les détails du log
+    fetch(`/documents/api/extraction-logs/${logId}/details/`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken(),
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            content.innerHTML = generateLogDetailsHTML(data.log);
+        } else {
+            content.innerHTML = '<div class="alert alert-danger">Erreur: ' + (data.error || 'Erreur inconnue') + '</div>';
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        content.innerHTML = '<div class="alert alert-danger">Erreur lors du chargement des détails: ' + error.message + '</div>';
+    });
+}
+
+function generateLogDetailsHTML(log) {
+    return `
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-file-alt"></i> Document</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Titre:</strong> ${log.document_title || 'N/A'}</li>
+                    <li><strong>ID:</strong> ${log.document_id}</li>
+                    <li><strong>Type:</strong> ${log.file_type ? log.file_type.toUpperCase() : 'N/A'}</li>
+                    ${log.url ? `<li><strong>URL:</strong> <a href="${log.url}" target="_blank" class="text-decoration-none">${log.url.length > 50 ? log.url.substring(0, 50) + '...' : log.url}</a></li>` : ''}
+                </ul>
+                
+                <h6><i class="fas fa-cogs"></i> Extraction</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Date:</strong> ${log.extraction_date}</li>
+                    <li><strong>Statut:</strong> <span class="badge bg-${log.status_color}">${log.status_label}</span></li>
+                    <li><strong>Contexte:</strong> ${log.context_label}</li>
+                    <li><strong>Temps:</strong> ${log.processing_time || 'N/A'}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="fas fa-tags"></i> Métadonnées Extraites</h6>
+                <ul class="list-unstyled">
+                    ${log.extracted_title ? `<li><strong><i class="fas fa-tag text-primary"></i> Titre:</strong> ${log.extracted_title}</li>` : '<li class="text-muted">Aucun titre extrait</li>'}
+                    ${log.extracted_date ? `<li><strong><i class="fas fa-calendar text-success"></i> Date:</strong> ${log.extracted_date}</li>` : '<li class="text-muted">Aucune date extraite</li>'}
+                    ${log.extracted_language ? `<li><strong><i class="fas fa-language text-info"></i> Langue:</strong> ${log.extracted_language.toUpperCase()}</li>` : '<li class="text-muted">Aucune langue détectée</li>'}
+                    ${log.extracted_source ? `<li><strong><i class="fas fa-building text-warning"></i> Source:</strong> ${log.extracted_source}</li>` : '<li class="text-muted">Aucune source identifiée</li>'}
+                    ${log.extracted_version ? `<li><strong><i class="fas fa-code-branch text-secondary"></i> Version:</strong> ${log.extracted_version}</li>` : '<li class="text-muted">Aucune version extraite</li>'}
+                </ul>
+                
+                <h6><i class="fas fa-chart-line"></i> Scores de Confiance</h6>
+                <ul class="list-unstyled">
+                    ${log.confidence_title ? `<li>Titre: <span class="badge bg-${getConfidenceColor(log.confidence_title)}">${log.confidence_title}%</span></li>` : ''}
+                    ${log.confidence_date ? `<li>Date: <span class="badge bg-${getConfidenceColor(log.confidence_date)}">${log.confidence_date}%</span></li>` : ''}
+                    ${log.confidence_language ? `<li>Langue: <span class="badge bg-${getConfidenceColor(log.confidence_language)}">${log.confidence_language}%</span></li>` : ''}
+                    ${log.confidence_source ? `<li>Source: <span class="badge bg-${getConfidenceColor(log.confidence_source)}">${log.confidence_source}%</span></li>` : ''}
+                    ${log.confidence_version ? `<li>Version: <span class="badge bg-${getConfidenceColor(log.confidence_version)}">${log.confidence_version}%</span></li>` : ''}
+                    ${!log.confidence_title && !log.confidence_date && !log.confidence_language && !log.confidence_source && !log.confidence_version ? '<li class="text-muted">Aucun score de confiance disponible</li>' : ''}
+                </ul>
+            </div>
+        </div>
+        ${log.notes ? `<hr><h6><i class="fas fa-sticky-note"></i> Notes</h6><p class="text-muted">${log.notes}</p>` : ''}
+        ${log.error_message ? `<hr><h6><i class="fas fa-exclamation-circle"></i> Erreur</h6><div class="alert alert-danger">${log.error_message}</div>` : ''}
+    `;
+}
+
+function getConfidenceColor(confidence) {
+    if (confidence >= 80) return 'success';
+    if (confidence >= 60) return 'warning';
+    return 'danger';
+}
+
+function retryExtraction(documentId) {
+    if (confirm('Voulez-vous relancer l\'extraction pour ce document ?')) {
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        
+        btn.innerHTML = '<i class="fas fa-spin fa-spinner"></i>';
+        btn.disabled = true;
+        
+        fetch(`/api/documents/${documentId}/reextract/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Extraction relancée avec succès !');
+                location.reload();
+            } else {
+                alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de la réextraction: ' + error.message);
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        });
+    }
+}
+
+function refreshLogs() {
+    location.reload();
+}
+
+function exportLogs() {
+    // Construire l'URL d'export avec les filtres actuels
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    
+    window.open(`/documents/extraction-logs/export/?${params.toString()}`, '_blank');
+}
+
+// Auto-refresh toutes les 30 secondes si on n'est pas sur un document spécifique
+if (!window.location.search.includes('document=')) {
+    setInterval(function() {
+        // Rafraîchissement silencieux des statistiques
+        console.log('Actualisation des statistiques...');
+    }, 30000);
+}
+</script>
+{% endblock %}

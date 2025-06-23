@@ -1,0 +1,500 @@
+{% extends 'base.html' %}
+
+{% block title %}Tâches de {{ expert.user.get_full_name|default:expert.user.username }} - RegAnnotator{% endblock %}
+{% block page_title %}Tâches de l'Expert{% endblock %}
+
+{% block content %}
+<!-- En-tête expert -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                         style="width: 50px; height: 50px; font-size: 1.2rem;">
+                        {{ expert.user.first_name.0|default:expert.user.username.0|upper }}
+                    </div>
+                </div>
+                <div>
+                    <h5 class="mb-1">{{ expert.user.get_full_name|default:expert.user.username }}</h5>
+                    <p class="text-muted mb-0">
+                        {{ expert.get_expertise_level_display }} • {{ expert.company|default:"Indépendant" }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card text-center">
+            <div class="btn-group w-100">
+                <a href="{% url 'experts:expert_detail' expert.id %}" class="btn btn-outline-primary">
+                    <i class="fas fa-user"></i> Profil
+                </a>
+                <a href="{% url 'experts:assign_task' %}?expert_id={{ expert.id }}" class="btn btn-success">
+                    <i class="fas fa-plus"></i> Nouvelle Tâche
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistiques des tâches -->
+<div class="row mb-4">
+    {% with total_tasks=page_obj.paginator.count %}
+    {% with completed_tasks=page_obj.object_list|dictsort:"status"|dictsort:"completed"|length %}
+    {% with pending_tasks=page_obj.object_list|dictsort:"status"|dictsort:"pending"|length %}
+    {% with in_progress_tasks=page_obj.object_list|dictsort:"status"|dictsort:"in_progress"|length %}
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-primary">{{ total_tasks }}</div>
+            <h6 class="text-muted">Total Tâches</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-warning">{{ pending_tasks }}</div>
+            <h6 class="text-muted">En Attente</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-info">{{ in_progress_tasks }}</div>
+            <h6 class="text-muted">En Cours</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-success">{{ completed_tasks }}</div>
+            <h6 class="text-muted">Terminées</h6>
+        </div>
+    </div>
+    
+    {% endwith %}
+    {% endwith %}
+    {% endwith %}
+    {% endwith %}
+</div>
+
+<!-- Filtres -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">Tous les statuts</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if current_filters.status == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="task_type" class="form-select">
+                        <option value="">Tous les types</option>
+                        {% for value, label in task_types %}
+                            <option value="{{ value }}" {% if current_filters.task_type == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <input type="date" name="date_from" class="form-control" 
+                           value="{{ request.GET.date_from }}" title="Date de début">
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Filtrer
+                        </button>
+                        <a href="{% url 'experts:expert_tasks' expert.id %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-around">
+                <button class="btn btn-outline-success btn-sm" onclick="markAllCompleted()">
+                    <i class="fas fa-check-double"></i> Terminer Tout
+                </button>
+                <button class="btn btn-outline-info btn-sm" onclick="exportTasks()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <button class="btn btn-outline-warning btn-sm" onclick="generateTaskReport()">
+                    <i class="fas fa-chart-bar"></i> Rapport
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des tâches -->
+<div class="stat-card">
+    <h5 class="mb-3">
+        Tâches Assignées
+        <span class="badge bg-secondary ms-2">{{ page_obj.paginator.count }}</span>
+    </h5>
+    
+    {% if page_obj %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" id="select-all" onchange="toggleAllTasks()">
+                        </th>
+                        <th>Tâche</th>
+                        <th>Type</th>
+                        <th>Priorité</th>
+                        <th>Statut</th>
+                        <th>Document</th>
+                        <th>Échéance</th>
+                        <th>Progression</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in page_obj %}
+                    <tr class="task-row" data-task-id="{{ task.id }}">
+                        <td>
+                            <input type="checkbox" class="task-checkbox" value="{{ task.id }}">
+                        </td>
+                        <td>
+                            <div>
+                                <strong>{{ task.title }}</strong>
+                                <br><small class="text-muted">{{ task.description|truncatechars:60 }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ task.get_task_type_display }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if task.priority == 'urgent' %}danger{% elif task.priority == 'high' %}warning{% else %}secondary{% endif %}">
+                                {{ task.get_priority_display }}
+                                {% if task.priority == 'urgent' %}
+                                    <i class="fas fa-exclamation-triangle ms-1"></i>
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if task.status == 'completed' %}success{% elif task.status == 'in_progress' %}primary{% elif task.status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                {{ task.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if task.document %}
+                                <a href="{% url 'dashboard:document_detail' task.document.id %}" 
+                                   class="text-decoration-none">
+                                    <i class="fas fa-file-pdf text-danger me-1"></i>
+                                    {{ task.document.title|truncatechars:30 }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.due_date %}
+                                <small class="{% if task.due_date < today %}text-danger{% elif task.due_date == today %}text-warning{% else %}text-muted{% endif %}">
+                                    {{ task.due_date|date:"d/m/Y" }}
+                                    {% if task.due_date < today %}
+                                        <br><span class="badge bg-danger">En retard</span>
+                                    {% elif task.due_date == today %}
+                                        <br><span class="badge bg-warning">Aujourd'hui</span>
+                                    {% endif %}
+                                </small>
+                            {% else %}
+                                <span class="text-muted">Non définie</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.status == 'completed' %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-success" style="width: 100%"></div>
+                                </div>
+                                <small class="text-success">100%</small>
+                            {% elif task.status == 'in_progress' %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-primary" style="width: 60%"></div>
+                                </div>
+                                <small class="text-primary">En cours</small>
+                            {% else %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-warning" style="width: 10%"></div>
+                                </div>
+                                <small class="text-warning">En attente</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" onclick="viewTaskDetails({{ task.id }})" title="Voir détails">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% if task.status != 'completed' %}
+                                    <button class="btn btn-outline-success" onclick="markTaskCompleted({{ task.id }})" title="Marquer terminé">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                {% endif %}
+                                {% if task.status == 'pending' %}
+                                    <button class="btn btn-outline-info" onclick="startTask({{ task.id }})" title="Commencer">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                {% endif %}
+                                <button class="btn btn-outline-secondary" onclick="editTask({{ task.id }})" title="Éditer">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Actions en lot -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div id="bulk-actions" style="display: none;">
+                <button class="btn btn-sm btn-success" onclick="bulkComplete()">
+                    <i class="fas fa-check"></i> Terminer sélectionnées
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="bulkStart()">
+                    <i class="fas fa-play"></i> Démarrer sélectionnées
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="bulkCancel()">
+                    <i class="fas fa-ban"></i> Annuler sélectionnées
+                </button>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <nav aria-label="Navigation des tâches" class="mt-3">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Premier</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Précédent</a>
+                        </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Suivant</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Dernier</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+            <h6 class="text-muted">Aucune tâche assignée</h6>
+            <p class="text-muted">Cet expert n'a pas encore de tâches assignées.</p>
+            <a href="{% url 'experts:assign_task' %}?expert_id={{ expert.id }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Assigner une Tâche
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal détail de tâche -->
+<div class="modal fade" id="taskDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Détail de la Tâche</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="taskDetailContent">
+                <!-- Contenu chargé dynamiquement -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Gestion des sélections multiples
+function toggleAllTasks() {
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.task-checkbox');
+    const bulkActions = document.getElementById('bulk-actions');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    bulkActions.style.display = selectAll.checked ? 'block' : 'none';
+}
+
+// Afficher/masquer actions en lot
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('task-checkbox')) {
+        const checkedBoxes = document.querySelectorAll('.task-checkbox:checked');
+        const bulkActions = document.getElementById('bulk-actions');
+        bulkActions.style.display = checkedBoxes.length > 0 ? 'block' : 'none';
+    }
+});
+
+function viewTaskDetails(taskId) {
+    fetch(`/api/tasks/${taskId}/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('taskDetailContent').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Informations Générales</h6>
+                        <p><strong>Titre:</strong> ${data.title}</p>
+                        <p><strong>Type:</strong> ${data.task_type}</p>
+                        <p><strong>Priorité:</strong> ${data.priority}</p>
+                        <p><strong>Statut:</strong> ${data.status}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Dates</h6>
+                        <p><strong>Créée le:</strong> ${data.created_at}</p>
+                        <p><strong>Échéance:</strong> ${data.due_date || 'Non définie'}</p>
+                        <p><strong>Commencée:</strong> ${data.started_at || 'Pas encore'}</p>
+                        <p><strong>Terminée:</strong> ${data.completed_at || 'Pas encore'}</p>
+                    </div>
+                </div>
+                <hr>
+                <h6>Description</h6>
+                <p>${data.description}</p>
+                ${data.result_notes ? `<hr><h6>Notes de résultat</h6><p>${data.result_notes}</p>` : ''}
+            `;
+            new bootstrap.Modal(document.getElementById('taskDetailModal')).show();
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors du chargement des détails');
+        });
+}
+
+function markTaskCompleted(taskId) {
+    if (confirm('Marquer cette tâche comme terminée ?')) {
+        updateTaskStatus(taskId, 'completed');
+    }
+}
+
+function startTask(taskId) {
+    updateTaskStatus(taskId, 'in_progress');
+}
+
+function updateTaskStatus(taskId, status) {
+    fetch(`/api/tasks/${taskId}/update-status/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({status: status})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    });
+}
+
+function bulkComplete() {
+    const selected = getSelectedTasks();
+    if (selected.length > 0 && confirm(`Marquer ${selected.length} tâche(s) comme terminées ?`)) {
+        bulkUpdateStatus(selected, 'completed');
+    }
+}
+
+function bulkStart() {
+    const selected = getSelectedTasks();
+    if (selected.length > 0 && confirm(`Démarrer ${selected.length} tâche(s) ?`)) {
+        bulkUpdateStatus(selected, 'in_progress');
+    }
+}
+
+function bulkCancel() {
+    const selected = getSelectedTasks();
+    if (selected.length > 0 && confirm(`Annuler ${selected.length} tâche(s) ?`)) {
+        bulkUpdateStatus(selected, 'cancelled');
+    }
+}
+
+function getSelectedTasks() {
+    return Array.from(document.querySelectorAll('.task-checkbox:checked')).map(cb => cb.value);
+}
+
+function bulkUpdateStatus(taskIds, status) {
+    fetch('/api/tasks/bulk-update/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({task_ids: taskIds, status: status})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    });
+}
+
+function exportTasks() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    window.open(`/experts/{{ expert.id }}/tasks/export/?` + params.toString());
+}
+
+function generateTaskReport() {
+    window.open(`/experts/{{ expert.id }}/tasks/report/`);
+}
+
+function editTask(taskId) {
+    window.location.href = `/experts/tasks/${taskId}/edit/`;
+}
+
+function markAllCompleted() {
+    if (confirm('Marquer TOUTES les tâches comme terminées ?')) {
+        fetch('/api/experts/{{ expert.id }}/tasks/complete-all/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

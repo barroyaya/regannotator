@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}RegAnnotator{% endblock %}</title>
+
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #2c5aa0;
+            --secondary-color: #f8f9fa;
+            --accent-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --sidebar-width: 280px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, var(--primary-color) 0%, #1e3d72 100%);
+            color: white;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .sidebar-brand {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar-brand h4 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background-color: rgba(255,255,255,0.1);
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .nav-link i {
+            width: 20px;
+            margin-right: 10px;
+        }
+
+        /* Submenu styles */
+        .nav-submenu {
+            background-color: rgba(0,0,0,0.1);
+            border-left: 2px solid rgba(255,255,255,0.1);
+            margin-left: 1rem;
+        }
+
+        .nav-submenu .nav-link {
+            padding: 0.5rem 1rem 0.5rem 2rem;
+            font-size: 0.9rem;
+        }
+
+        .nav-submenu .nav-link:hover, .nav-submenu .nav-link.active {
+            border-left: 3px solid var(--accent-color);
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+        }
+
+        .top-navbar {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .content-wrapper {
+            padding: 0 2rem 2rem 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .annotation-highlight {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 2px 4px;
+            margin: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .annotation-highlight:hover {
+            background-color: #ffe69c;
+            transform: scale(1.02);
+        }
+
+        .entity-VARIATION_CODE { border-left: 4px solid #007bff; }
+        .entity-AUTHORITY { border-left: 4px solid #28a745; }
+        .entity-TIMELINE { border-left: 4px solid #ffc107; }
+        .entity-LEGAL_REFERENCE { border-left: 4px solid #dc3545; }
+
+        .annotation-editor {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+
+        .sentence-display {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .validation-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-validate {
+            background: var(--accent-color);
+            border: none;
+            color: white;
+        }
+
+        .btn-reject {
+            background: var(--danger-color);
+            border: none;
+            color: white;
+        }
+
+        .confidence-badge {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .high-confidence { background-color: #d4edda; color: #155724; }
+        .medium-confidence { background-color: #fff3cd; color: #856404; }
+        .low-confidence { background-color: #f8d7da; color: #721c24; }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <h4><i class="fas fa-microscope"></i> RegAnnotator</h4>
+            <small>Annotation Réglementaire IA</small>
+        </div>
+
+        <ul class="nav flex-column sidebar-nav">
+            <!-- Dashboard -->
+            <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.view_name == 'dashboard:home' %}active{% endif %}" href="{% url 'dashboard:home' %}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+
+            <!-- Documents -->
+            <li class="nav-item">
+                <a class="nav-link {% if 'dashboard:document' in request.resolver_match.view_name %}active{% endif %}" href="{% url 'dashboard:document_list' %}">
+                    <i class="fas fa-file-pdf"></i> Documents
+                </a>
+            </li>
+
+            <!-- Annotations -->
+            <li class="nav-item">
+                <a class="nav-link {% if 'annotations:' in request.resolver_match.view_name %}active{% endif %}" href="{% url 'annotations:statistics' %}">
+                    <i class="fas fa-tags"></i> Annotations
+                </a>
+                <ul class="nav flex-column nav-submenu">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'annotations:statistics' %}active{% endif %}" href="{% url 'annotations:statistics' %}">
+                            <i class="fas fa-chart-pie"></i> Statistiques
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'annotations:sessions' %}active{% endif %}" href="{% url 'annotations:sessions' %}">
+                            <i class="fas fa-play-circle"></i> Sessions
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'annotations:create_annotation' %}active{% endif %}" href="{% url 'annotations:create_annotation' %}">
+                            <i class="fas fa-plus"></i> Créer annotation
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'annotations:feedback_list' %}active{% endif %}" href="{% url 'annotations:feedback_list' %}">
+                            <i class="fas fa-comments"></i> Feedback experts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'annotations:export' %}active{% endif %}" href="{% url 'annotations:export' %}">
+                            <i class="fas fa-download"></i> Export/Import
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
+            <!-- Experts -->
+            <li class="nav-item">
+                <a class="nav-link {% if 'experts:' in request.resolver_match.view_name %}active{% endif %}" href="{% url 'experts:dashboard' %}">
+                    <i class="fas fa-users"></i> Experts
+                </a>
+                <ul class="nav flex-column nav-submenu">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'experts:dashboard' %}active{% endif %}" href="{% url 'experts:dashboard' %}">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'experts:expert_list' %}active{% endif %}" href="{% url 'experts:expert_list' %}">
+                            <i class="fas fa-list"></i> Liste experts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'experts:create_profile' %}active{% endif %}" href="{% url 'experts:create_profile' %}">
+                            <i class="fas fa-user-plus"></i> Nouveau profil
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'experts:assign_task' %}active{% endif %}" href="{% url 'experts:assign_task' %}">
+                            <i class="fas fa-tasks"></i> Assigner tâche
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'admin:auth_user_changelist' %}">
+                            <i class="fas fa-users-cog"></i> Gestion utilisateurs
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
+            <!-- Modèles IA -->
+            <li class="nav-item">
+                <a class="nav-link {% if 'ml:' in request.resolver_match.view_name %}active{% endif %}" href="{% url 'ml:training_dashboard' %}">
+                    <i class="fas fa-brain"></i> Modèles IA
+                </a>
+                <ul class="nav flex-column nav-submenu">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'ml:training_dashboard' %}active{% endif %}" href="{% url 'ml:training_dashboard' %}">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard ML
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'ml:create_training' %}active{% endif %}" href="{% url 'ml:create_training' %}">
+                            <i class="fas fa-plus-circle"></i> Nouveau modèle
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'ml:model_list' %}active{% endif %}" href="{% url 'ml:model_list' %}">
+                            <i class="fas fa-code-branch"></i> Modèles
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'ml:expert_rules' %}active{% endif %}" href="{% url 'ml:expert_rules' %}">
+                            <i class="fas fa-ruler"></i> Règles expertes
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'ml:analytics' %}active{% endif %}" href="{% url 'ml:analytics' %}">
+                            <i class="fas fa-chart-line"></i> Analytics ML
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.view_name == 'ml:performance' %}active{% endif %}" href="{% url 'ml:performance' %}">
+                            <i class="fas fa-speedometer"></i> Performance
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
+            <!-- Analytics -->
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'annotations:statistics' %}">
+                    <i class="fas fa-chart-bar"></i> Analytics
+                </a>
+            </li>
+
+            <!-- Administration -->
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'admin:index' %}">
+                    <i class="fas fa-cog"></i> Administration
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Navbar -->
+        <nav class="top-navbar">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">{% block page_title %}Dashboard{% endblock %}</h5>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="me-3">Bonjour, {{ user.get_full_name|default:user.username }}</span>
+                    <a href="{% url 'admin:logout' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Déconnexion
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Content -->
+        <div class="content-wrapper">
+            {% if messages and messages|length > 0 %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Initialisation des tooltips Bootstrap
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

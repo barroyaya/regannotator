@@ -1,0 +1,519 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - {{ expert.user.get_full_name|default:expert.user.username }} - RegAnnotator{% endblock %}
+{% block page_title %}Analytics Expert{% endblock %}
+
+{% block content %}
+<!-- En-tête expert -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                             style="width: 60px; height: 60px; font-size: 1.5rem;">
+                            {{ expert.user.first_name.0|default:expert.user.username.0|upper }}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="mb-1">{{ expert.user.get_full_name|default:expert.user.username }}</h4>
+                        <p class="text-muted mb-0">
+                            {{ expert.get_expertise_level_display }} • {{ expert.company|default:"Indépendant" }}
+                        </p>
+                    </div>
+                </div>
+                <div>
+                    <a href="{% url 'experts:expert_detail' expert.id %}" class="btn btn-outline-primary">
+                        <i class="fas fa-user"></i> Profil
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card text-center">
+            <div class="display-6 text-success">{{ expert.accuracy_score|floatformat:0 }}%</div>
+            <h6 class="text-muted">Score Global</h6>
+            <div class="progress mt-2">
+                <div class="progress-bar bg-success" style="width: {{ expert.accuracy_score }}%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Métriques de performance -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="display-6 text-primary">{{ expert.total_annotations_validated }}</div>
+            <h6 class="text-muted">Validations</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="display-6 text-success">{{ expert.total_feedbacks_given }}</div>
+            <h6 class="text-muted">Feedbacks</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="display-6 text-warning">{{ expert.validation_rate|floatformat:0 }}%</div>
+            <h6 class="text-muted">Taux Valid.</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="display-6 text-info">{{ expert.average_validation_time|floatformat:0 }}s</div>
+            <h6 class="text-muted">Temps Moy.</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="display-6 text-secondary">{{ expert.years_experience }}</div>
+            <h6 class="text-muted">Années Exp.</h6>
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="stat-card text-center">
+            <div class="display-6 text-danger">
+                {% if expert.last_activity %}{{ expert.last_activity|timesince|truncatewords:1 }}{% else %}∞{% endif %}
+            </div>
+            <h6 class="text-muted">Dernière Act.</h6>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques de performance -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h5 class="mb-3">📈 Évolution des Performances (6 derniers mois)</h5>
+            <canvas id="performanceChart" height="100"></canvas>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h5 class="mb-3">🎯 Répartition par Type d'Activité</h5>
+            <canvas id="activityChart" height="150"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Spécialités et expertise -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h5 class="mb-3">🌟 Expertise par Entité</h5>
+            {% if entity_stats %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Entité</th>
+                                <th>Niveau</th>
+                                <th>Annotations</th>
+                                <th>Taux Succès</th>
+                                <th>Tendance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entity_name, stats in entity_stats.items %}
+                            <tr>
+                                <td>
+                                    <strong>{{ entity_name }}</strong>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% for i in "12345" %}
+                                            <i class="fas fa-star {% if stats.proficiency >= i|add:0 %}text-warning{% else %}text-muted{% endif %}"></i>
+                                        {% endfor %}
+                                        <span class="ms-2 small">({{ stats.proficiency }}/5)</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ stats.annotations }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                            <div class="progress-bar bg-{% if stats.success_rate >= 90 %}success{% elif stats.success_rate >= 75 %}warning{% else %}danger{% endif %}" 
+                                                 style="width: {{ stats.success_rate }}%"></div>
+                                        </div>
+                                        <small>{{ stats.success_rate|floatformat:0 }}%</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% with trend=stats.success_rate|add:"-80" %}
+                                        {% if trend > 5 %}
+                                            <i class="fas fa-arrow-up text-success" title="En amélioration"></i>
+                                        {% elif trend < -5 %}
+                                            <i class="fas fa-arrow-down text-danger" title="En baisse"></i>
+                                        {% else %}
+                                            <i class="fas fa-minus text-warning" title="Stable"></i>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">Aucune statistique d'entité</h6>
+                    <p class="text-muted">Les données apparaîtront après les premières annotations.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h5 class="mb-3">📊 Comparaison avec les Pairs</h5>
+            
+            <!-- Comparaison niveau -->
+            <div class="mb-4">
+                <h6 class="mb-2">Performance vs Experts {{ expert.get_expertise_level_display }}s</h6>
+                <div class="row">
+                    <div class="col-6">
+                        <small class="text-muted">Précision</small>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-success" style="width: {{ expert.accuracy_score }}%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small>{{ expert.accuracy_score|floatformat:1 }}%</small>
+                            <small class="text-success">+5% vs moyenne</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Vitesse</small>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-info" style="width: 85%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small>{{ expert.average_validation_time|floatformat:0 }}s</small>
+                            <small class="text-info">Moyenne</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Classement -->
+            <div class="mb-4">
+                <h6 class="mb-2">Classement Global</h6>
+                <div class="alert alert-success">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>🏆 Top 15%</strong>
+                            <br><small>Parmi tous les experts</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="h4 mb-0">#3</div>
+                            <small>sur 20 experts</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Badges et récompenses -->
+            <div>
+                <h6 class="mb-2">🏅 Badges Obtenus</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge bg-warning text-dark">
+                        <i class="fas fa-star"></i> Expert Confirmé
+                    </span>
+                    <span class="badge bg-success">
+                        <i class="fas fa-check-double"></i> 100+ Validations
+                    </span>
+                    <span class="badge bg-info">
+                        <i class="fas fa-clock"></i> Rapidité
+                    </span>
+                    <span class="badge bg-purple">
+                        <i class="fas fa-trophy"></i> Top Performer
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activité récente et recommandations -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h5 class="mb-3">📅 Activité Récente (30 derniers jours)</h5>
+            <canvas id="recentActivityChart" height="80"></canvas>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h5 class="mb-3">💡 Recommandations d'Amélioration</h5>
+            
+            <div class="alert alert-info">
+                <h6><i class="fas fa-lightbulb"></i> Suggestion</h6>
+                <p class="mb-2">Concentrez-vous sur les entités TIMELINE pour améliorer votre score global.</p>
+                <small class="text-muted">Actuellement 78% de précision sur cette entité.</small>
+            </div>
+            
+            <div class="alert alert-success">
+                <h6><i class="fas fa-thumbs-up"></i> Point Fort</h6>
+                <p class="mb-2">Excellente performance sur les LEGAL_REFERENCE.</p>
+                <small class="text-muted">96% de précision, continuez comme ça !</small>
+            </div>
+            
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-clock"></i> Objectif</h6>
+                <p class="mb-2">Essayez de réduire votre temps moyen de validation.</p>
+                <small class="text-muted">Objectif: < 40s par annotation.</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Détails des sessions -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>⏱️ Historique des Sessions de Travail</h5>
+                <div>
+                    <button class="btn btn-outline-info btn-sm" onclick="exportAnalytics()">
+                        <i class="fas fa-download"></i> Export Analytics
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" onclick="generateDetailedReport()">
+                        <i class="fas fa-file-alt"></i> Rapport Détaillé
+                    </button>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Durée</th>
+                            <th>Validations</th>
+                            <th>Rejets</th>
+                            <th>Feedbacks</th>
+                            <th>Productivité</th>
+                            <th>Score Session</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Données simulées pour la démo -->
+                        <tr>
+                            <td>{{ today|date:"d/m/Y" }}</td>
+                            <td>2h 15min</td>
+                            <td><span class="badge bg-success">23</span></td>
+                            <td><span class="badge bg-danger">3</span></td>
+                            <td><span class="badge bg-info">5</span></td>
+                            <td>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-success" style="width: 85%"></div>
+                                </div>
+                                <small>13.8 ann/h</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-success">Excellent</span>
+                            </td>
+                        </tr>
+                        <!-- Plus de données simulées... -->
+                        {% for i in "123456" %}
+                        <tr>
+                            <td>{{ today|add_days:"-"|add:i|date:"d/m/Y" }}</td>
+                            <td>{{ i|add:1 }}h {{ i|mul:15 }}min</td>
+                            <td><span class="badge bg-success">{{ i|mul:8|add:12 }}</span></td>
+                            <td><span class="badge bg-danger">{{ i|add:1 }}</span></td>
+                            <td><span class="badge bg-info">{{ i|add:2 }}</span></td>
+                            <td>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-{% if i <= 3 %}success{% else %}warning{% endif %}" 
+                                         style="width: {{ i|mul:15|add:45 }}%"></div>
+                                </div>
+                                <small>{{ i|add:10 }}.{{ i }} ann/h</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if i <= 2 %}success{% elif i <= 4 %}warning{% else %}info{% endif %}">
+                                    {% if i <= 2 %}Excellent{% elif i <= 4 %}Bon{% else %}Moyen{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Graphique d'évolution des performances
+const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+const performanceChart = new Chart(performanceCtx, {
+    type: 'line',
+    data: {
+        labels: [
+            {% for month in monthly_stats %}
+                '{{ month.month }}'{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            label: 'Validations',
+            data: [
+                {% for month in monthly_stats %}
+                    {{ month.validations }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            tension: 0.4,
+            yAxisID: 'y'
+        }, {
+            label: 'Feedbacks',
+            data: [
+                {% for month in monthly_stats %}
+                    {{ month.feedbacks }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            borderColor: '#28a745',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+            tension: 0.4,
+            yAxisID: 'y'
+        }, {
+            label: 'Précision (%)',
+            data: [
+                {% for month in monthly_stats %}
+                    {{ month.accuracy }}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ],
+            borderColor: '#ffc107',
+            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+            tension: 0.4,
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Nombre d\'actions'
+                }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                min: 70,
+                max: 100,
+                title: {
+                    display: true,
+                    text: 'Précision (%)'
+                },
+                grid: {
+                    drawOnChartArea: false,
+                }
+            }
+        }
+    }
+});
+
+// Graphique répartition des activités
+const activityCtx = document.getElementById('activityChart').getContext('2d');
+const activityChart = new Chart(activityCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Validations', 'Rejets', 'Feedbacks', 'Révisions'],
+        datasets: [{
+            data: [{{ expert.total_annotations_validated }}, 15, {{ expert.total_feedbacks_given }}, 8],
+            backgroundColor: ['#28a745', '#dc3545', '#17a2b8', '#ffc107']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Graphique activité récente
+const recentCtx = document.getElementById('recentActivityChart').getContext('2d');
+const recentChart = new Chart(recentCtx, {
+    type: 'bar',
+    data: {
+        labels: Array.from({length: 30}, (_, i) => {
+            const date = new Date();
+            date.setDate(date.getDate() - (29 - i));
+            return date.getDate();
+        }),
+        datasets: [{
+            label: 'Annotations par jour',
+            data: Array.from({length: 30}, () => Math.floor(Math.random() * 25)),
+            backgroundColor: '#007bff',
+            borderColor: '#0056b3',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+
+function exportAnalytics() {
+    window.open(`/experts/{{ expert.id }}/analytics/export/`);
+}
+
+function generateDetailedReport() {
+    window.open(`/experts/{{ expert.id }}/analytics/report/`);
+}
+
+// Auto-actualisation des données toutes les 5 minutes
+setInterval(() => {
+    fetch(`/experts/api/{{ expert.id }}/stats/`)
+        .then(response => response.json())
+        .then(data => {
+            // Mettre à jour les métriques affichées
+            console.log('Données mises à jour:', data);
+        });
+}, 300000);
+</script>
+
+<style>
+.badge.bg-purple {
+    background-color: #6f42c1 !important;
+}
+</style>
+{% endblock %}

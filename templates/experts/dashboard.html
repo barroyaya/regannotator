@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Experts - RegAnnotator{% endblock %}
+{% block page_title %}Dashboard des Experts{% endblock %}
+
+{% block content %}
+<!-- Statistiques globales -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-primary">{{ stats.total_experts }}</div>
+            <h6 class="text-muted">Experts Total</h6>
+            <div class="mt-2">
+                <i class="fas fa-users fa-2x text-primary"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-success">{{ stats.active_experts }}</div>
+            <h6 class="text-muted">Actifs Aujourd'hui</h6>
+            <div class="mt-2">
+                <i class="fas fa-user-check fa-2x text-success"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-warning">{{ stats.total_validations }}</div>
+            <h6 class="text-muted">Validations Total</h6>
+            <div class="mt-2">
+                <i class="fas fa-check-double fa-2x text-warning"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card text-center">
+            <div class="display-6 text-info">{{ stats.avg_accuracy|floatformat:1 }}%</div>
+            <h6 class="text-muted">Précision Moyenne</h6>
+            <div class="mt-2">
+                <i class="fas fa-bullseye fa-2x text-info"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions rapides -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h6 class="mb-3">Actions Rapides</h6>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <a href="{% url 'experts:create_profile' %}" class="btn btn-success">
+                            <i class="fas fa-user-plus"></i><br>
+                            Nouvel Expert
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <a href="{% url 'experts:assign_task' %}" class="btn btn-primary">
+                            <i class="fas fa-tasks"></i><br>
+                            Assigner Tâche
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <a href="{% url 'experts:expert_list' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-list"></i><br>
+                            Voir Tous
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-grid">
+                        <button class="btn btn-outline-info" onclick="generateReport()">
+                            <i class="fas fa-chart-bar"></i><br>
+                            Rapport Global
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="stat-card">
+            <h6 class="mb-3 text-center">Répartition par Niveau</h6>
+            <canvas id="expertLevelChart" height="150"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Top experts et tâches récentes -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <h5 class="mb-3">🏆 Top Experts</h5>
+            <div class="list-group list-group-flush">
+                {% for expert in top_experts %}
+                    <a href="{% url 'experts:expert_detail' expert.id %}" 
+                       class="list-group-item list-group-item-action border-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                                         style="width: 40px; height: 40px;">
+                                        {{ expert.user.first_name.0|default:expert.user.username.0|upper }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">{{ expert.user.get_full_name|default:expert.user.username }}</h6>
+                                    <small class="text-muted">
+                                        {{ expert.company|default:expert.get_expertise_level_display }} • 
+                                        {{ expert.years_experience }} ans d'exp.
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="h6 text-success mb-0">{{ expert.total_annotations_validated }}</div>
+                                <small class="text-muted">validations</small>
+                            </div>
+                        </div>
+                    </a>
+                {% empty %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-user-graduate fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">Aucun expert trouvé</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>📋 Tâches Récentes</h5>
+                <a href="{% url 'experts:assign_task' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-plus"></i> Nouvelle
+                </a>
+            </div>
+            
+            <div class="list-group list-group-flush">
+                {% for task in recent_tasks %}
+                    <div class="list-group-item border-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ task.title|truncatechars:40 }}</h6>
+                                <p class="mb-1 text-muted small">{{ task.description|truncatechars:60 }}</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-user"></i> {{ task.expert.user.username }} • 
+                                    <i class="fas fa-clock"></i> {{ task.created_at|timesince }}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-{% if task.status == 'completed' %}success{% elif task.status == 'in_progress' %}primary{% elif task.status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                    {{ task.get_status_display }}
+                                </span>
+                                <br>
+                                <span class="badge bg-{% if task.priority == 'urgent' %}danger{% elif task.priority == 'high' %}warning{% else %}info{% endif %} mt-1">
+                                    {{ task.get_priority_display }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-tasks fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">Aucune tâche récente</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Graphique d'activité -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <h5 class="mb-3">📈 Activité des Experts (7 derniers jours)</h5>
+            <canvas id="activityChart" height="80"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Graphique répartition par niveau
+const levelCtx = document.getElementById('expertLevelChart').getContext('2d');
+const levelChart = new Chart(levelCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Junior', 'Confirmé', 'Senior', 'Expert'],
+        datasets: [{
+            data: [
+                {% with experts_by_level=experts|dictsort:"expertise_level" %}
+                    {{ experts_by_level|dictsort:"junior"|length }},
+                    {{ experts_by_level|dictsort:"confirmed"|length }},
+                    {{ experts_by_level|dictsort:"senior"|length }},
+                    {{ experts_by_level|dictsort:"expert"|length }}
+                {% endwith %}
+            ],
+            backgroundColor: ['#ffc107', '#17a2b8', '#28a745', '#dc3545']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Graphique d'activité (données simulées)
+const activityCtx = document.getElementById('activityChart').getContext('2d');
+const activityChart = new Chart(activityCtx, {
+    type: 'line',
+    data: {
+        labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
+        datasets: [{
+            label: 'Validations',
+            data: [12, 19, 15, 25, 22, 8, 5],
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            tension: 0.4
+        }, {
+            label: 'Feedbacks',
+            data: [8, 12, 10, 15, 14, 5, 3],
+            borderColor: '#28a745',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+function generateReport() {
+    window.open('/experts/reports/global/', '_blank');
+}
+</script>
+{% endblock %}

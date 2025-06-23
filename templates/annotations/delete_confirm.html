@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Supprimer Annotation - RegAnnotator{% endblock %}
+{% block page_title %}Confirmation de Suppression{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="stat-card">
+            <div class="text-center mb-4">
+                <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+                <h5 class="text-danger">Supprimer cette Annotation ?</h5>
+            </div>
+            
+            <!-- Informations de l'annotation -->
+            <div class="alert alert-warning">
+                <h6>Annotation à supprimer :</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Type :</strong><br>
+                        <span class="badge" style="background-color: {{ annotation.entity_type.color }};">
+                            {{ annotation.entity_type.name }}
+                        </span>
+                    </div>
+                    <div class="col-md-8">
+                        <strong>Valeur :</strong><br>
+                        "{{ annotation.text_value }}"
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Document :</strong><br>
+                        <small>{{ annotation.sentence.document.title|truncatechars:40 }}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Phrase :</strong><br>
+                        <small>{{ annotation.sentence.sentence_number }}</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contexte de la phrase -->
+            <div class="mb-4">
+                <h6>Contexte :</h6>
+                <div class="bg-light p-3 rounded">
+                    <small>{{ annotation.sentence.text }}</small>
+                </div>
+            </div>
+            
+            <!-- Avertissement -->
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Attention :</strong> Cette action est irréversible. L'annotation et tous ses feedbacks associés seront définitivement supprimés.
+            </div>
+            
+            <!-- Statistiques de l'annotation -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="h6 text-info">{{ annotation.confidence_score|floatformat:2 }}</div>
+                        <small class="text-muted">Confiance</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="h6 text-primary">{{ annotation.get_source_display }}</div>
+                        <small class="text-muted">Source</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="h6 text-warning">{{ annotation.feedbacks.count }}</div>
+                        <small class="text-muted">Feedback(s)</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                    <a href="{% url 'annotations:annotation_editor' annotation.sentence.id %}" 
+                       class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Annuler
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Oui, Supprimer Définitivement
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Alternative -->
+            <div class="mt-3 text-center">
+                <small class="text-muted">
+                    Plutôt que de supprimer, vous pouvez 
+                    <a href="{% url 'annotations:edit_annotation' annotation.id %}">modifier l'annotation</a>
+                    ou la <a href="#" onclick="rejectAnnotation()">rejeter</a>.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function rejectAnnotation() {
+    if (confirm('Rejeter cette annotation au lieu de la supprimer ?')) {
+        fetch('{% url "annotations:validate_annotation" annotation.id %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({action: 'reject'})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.href = '{% url "annotations:annotation_editor" annotation.sentence.id %}';
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

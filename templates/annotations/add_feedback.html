@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Ajouter Feedback - RegAnnotator{% endblock %}
+{% block page_title %}Ajouter un Feedback Expert{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <!-- Contexte de l'annotation -->
+        <div class="stat-card mb-4">
+            <h6 class="mb-3">Annotation Concernée</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge me-2" style="background-color: {{ annotation.entity_type.color }};">
+                            {{ annotation.entity_type.name }}
+                        </span>
+                        <strong>"{{ annotation.text_value }}"</strong>
+                    </div>
+                    <small class="text-muted">
+                        Confiance: {{ annotation.confidence_score|floatformat:2 }} • 
+                        Source: {{ annotation.get_source_display }} •
+                        Statut: {{ annotation.get_validation_status_display }}
+                    </small>
+                </div>
+                <div class="col-md-6">
+                    <strong>Document :</strong><br>
+                    <small class="text-muted">{{ annotation.sentence.document.title|truncatechars:50 }}</small>
+                    <br><strong>Phrase {{ annotation.sentence.sentence_number }} :</strong>
+                </div>
+            </div>
+            <hr>
+            <div class="bg-light p-3 rounded">
+                <small>{{ annotation.sentence.text }}</small>
+            </div>
+        </div>
+        
+        <!-- Formulaire de feedback -->
+        <div class="stat-card">
+            <h5 class="mb-4">Nouveau Feedback</h5>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Type de feedback <span class="text-danger">*</span></label>
+                            <select class="form-select" name="feedback_type" required id="feedback-type">
+                                <option value="">Choisir...</option>
+                                <option value="correction">Correction</option>
+                                <option value="suggestion">Suggestion</option>
+                                <option value="validation">Validation</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="suggested-value-group" style="display: none;">
+                            <label class="form-label">Valeur suggérée</label>
+                            <input type="text" class="form-control" name="suggested_value" 
+                                   placeholder="Nouvelle valeur proposée">
+                            <div class="form-text">Laissez vide si pas de suggestion spécifique</div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Commentaire <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="comment" rows="5" required
+                                      placeholder="Décrivez votre feedback..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Exemples de feedback -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="accordion" id="feedbackExamples">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" 
+                                            data-bs-toggle="collapse" data-bs-target="#examples">
+                                        <i class="fas fa-lightbulb me-2"></i>
+                                        Exemples de Feedback
+                                    </button>
+                                </h2>
+                                <div id="examples" class="accordion-collapse collapse">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <h6 class="text-success">Correction</h6>
+                                                <small>
+                                                    • "Le code de variation correct est Type IA, pas Type IB"<br>
+                                                    • "Cette référence fait référence à l'Article 62, pas 61"<br>
+                                                    • "L'autorité mentionnée est la FDA, pas l'EMA"
+                                                </small>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6 class="text-primary">Suggestion</h6>
+                                                <small>
+                                                    • "Pourrait inclure également le délai mentionné"<br>
+                                                    • "Annotation trop restrictive, peut être élargie"<br>
+                                                    • "Manque le contexte de la condition requise"
+                                                </small>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6 class="text-info">Validation</h6>
+                                                <small>
+                                                    • "Annotation parfaitement correcte"<br>
+                                                    • "Excellente détection, conforme aux guidelines"<br>
+                                                    • "Validation confirmée par expert métier"
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'annotations:annotation_editor' annotation.sentence.id %}" 
+                       class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-comment"></i> Ajouter le Feedback
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Feedbacks existants -->
+{% if annotation.feedbacks.exists %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="stat-card">
+            <h6 class="mb-3">Feedbacks Existants</h6>
+            {% for feedback in annotation.feedbacks.all %}
+                <div class="border rounded p-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>{{ feedback.expert.username }}</strong>
+                            <span class="badge bg-{{ feedback.feedback_type|yesno:'success,primary,info' }} ms-2">
+                                {{ feedback.get_feedback_type_display }}
+                            </span>
+                        </div>
+                        <small class="text-muted">{{ feedback.created_at|date:"d/m/Y H:i" }}</small>
+                    </div>
+                    <p class="mb-1 mt-2">{{ feedback.comment }}</p>
+                    {% if feedback.suggested_value %}
+                        <div class="badge bg-light text-dark">
+                            Suggestion: "{{ feedback.suggested_value }}"
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Afficher/masquer le champ valeur suggérée
+document.getElementById('feedback-type').addEventListener('change', function() {
+    const suggestedValueGroup = document.getElementById('suggested-value-group');
+    if (this.value === 'correction' || this.value === 'suggestion') {
+        suggestedValueGroup.style.display = 'block';
+        if (this.value === 'correction') {
+            document.querySelector('input[name="suggested_value"]').required = true;
+        }
+    } else {
+        suggestedValueGroup.style.display = 'none';
+        document.querySelector('input[name="suggested_value"]').required = false;
+    }
+});
+
+// Pré-remplir avec la valeur actuelle pour les corrections
+document.getElementById('feedback-type').addEventListener('change', function() {
+    if (this.value === 'correction') {
+        const currentValue = '{{ annotation.text_value }}';
+        document.querySelector('input[name="suggested_value"]').value = currentValue;
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Modifier la règle - {{ rule.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .edit-header {
+        background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+        color: white;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    .form-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-left: 4px solid #ffc107;
+    }
+    .form-group label {
+        font-weight: 600;
+        color: #495057;
+    }
+    .form-control {
+        border-radius: 6px;
+        border: 1px solid #ced4da;
+        transition: all 0.3s ease;
+    }
+    .form-control:focus {
+        border-color: #ffc107;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+    }
+    .btn-save {
+        background: linear-gradient(45deg, #ffc107, #fd7e14);
+        border: none;
+        padding: 12px 30px;
+        font-weight: bold;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3);
+    }
+    .pattern-help {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 1rem;
+        border-left: 4px solid #17a2b8;
+        margin-top: 1rem;
+    }
+    .rule-type-description {
+        background: #e7f3ff;
+        border-radius: 6px;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: #0c5460;
+    }
+    .confidence-slider {
+        width: 100%;
+        margin: 1rem 0;
+    }
+    .confidence-value {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #ffc107;
+    }
+    .preview-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+        border: 1px dashed #dee2e6;
+    }
+    .current-values {
+        background: #e9ecef;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="edit-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 mb-2">
+                    <i class="fas fa-edit"></i>
+                    Modifier la règle experte
+                </h1>
+                <p class="mb-0 opacity-75">{{ rule.name }}</p>
+            </div>
+            <div>
+                <a href="{% url 'ml:rule_detail' rule.id %}" class="btn btn-outline-light">
+                    <i class="fas fa-arrow-left"></i> Retour aux détails
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Formulaire principal -->
+            <div class="card form-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cogs text-warning"></i>
+                        Paramètres de la règle
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Valeurs actuelles -->
+                    <div class="current-values">
+                        <h6><i class="fas fa-info-circle"></i> Valeurs actuelles</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small><strong>Nom:</strong> {{ rule.name }}</small><br>
+                                <small><strong>Type:</strong> {{ rule.get_rule_type_display }}</small><br>
+                                <small><strong>Entité:</strong> {{ rule.entity_type.name }}</small>
+                            </div>
+                            <div class="col-md-6">
+                                <small><strong>Confiance:</strong> {{ rule.confidence_score }}</small><br>
+                                <small><strong>Statut:</strong> 
+                                    {% if rule.is_active %}
+                                        <span class="badge badge-success">Active</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Inactive</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" id="editRuleForm">
+                        {% csrf_token %}
+                        
+                        <!-- Nom de la règle -->
+                        <div class="form-group">
+                            <label for="name">
+                                <i class="fas fa-tag"></i>
+                                Nom de la règle *
+                            </label>
+                            <input type="text" class="form-control" id="name" name="name" 
+                                   value="{{ rule.name }}" required>
+                            <small class="form-text text-muted">
+                                Nom descriptif pour identifier cette règle
+                            </small>
+                        </div>
+
+                        <!-- Type d'entité -->
+                        <div class="form-group">
+                            <label for="entity_type_id">
+                                <i class="fas fa-sitemap"></i>
+                                Type d'entité *
+                            </label>
+                            <select class="form-control" id="entity_type_id" name="entity_type_id" required>
+                                {% for entity in entities %}
+                                    <option value="{{ entity.id }}" 
+                                            {% if entity.id == rule.entity_type.id %}selected{% endif %}>
+                                        {{ entity.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">
+                                Type d'entité réglementaire que cette règle détecte
+                            </small>
+                        </div>
+
+                        <!-- Type de règle -->
+                        <div class="form-group">
+                            <label for="rule_type">
+                                <i class="fas fa-code"></i>
+                                Type de règle *
+                            </label>
+                            <select class="form-control" id="rule_type" name="rule_type" required>
+                                <option value="pattern" {% if rule.rule_type == 'pattern' %}selected{% endif %}>
+                                    Motif textuel
+                                </option>
+                                <option value="regex" {% if rule.rule_type == 'regex' %}selected{% endif %}>
+                                    Expression régulière
+                                </option>
+                                <option value="keyword" {% if rule.rule_type == 'keyword' %}selected{% endif %}>
+                                    Mots-clés
+                                </option>
+                            </select>
+                            <div id="ruleTypeDescription" class="rule-type-description">
+                                <!-- Description dynamique selon le type sélectionné -->
+                            </div>
+                        </div>
+
+                        <!-- Motif/Pattern -->
+                        <div class="form-group">
+                            <label for="pattern">
+                                <i class="fas fa-search"></i>
+                                Motif de détection *
+                            </label>
+                            <textarea class="form-control" id="pattern" name="pattern" rows="4" required>{{ rule.pattern }}</textarea>
+                            <small class="form-text text-muted">
+                                Le motif utilisé pour détecter les entités dans le texte
+                            </small>
+                        </div>
+
+                        <!-- Score de confiance -->
+                        <div class="form-group">
+                            <label for="confidence_score">
+                                <i class="fas fa-tachometer-alt"></i>
+                                Score de confiance
+                            </label>
+                            <div class="d-flex align-items-center">
+                                <input type="range" class="confidence-slider" id="confidence_score" 
+                                       name="confidence_score" min="0" max="1" step="0.01" 
+                                       value="{{ rule.confidence_score }}">
+                                <span class="confidence-value ml-3" id="confidenceValue">{{ rule.confidence_score }}</span>
+                            </div>
+                            <small class="form-text text-muted">
+                                Niveau de confiance pour les correspondances (0.0 = faible, 1.0 = élevé)
+                            </small>
+                        </div>
+
+                        <!-- Statut actif -->
+                        <div class="form-group form-check">
+                            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" 
+                                   {% if rule.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="is_active">
+                                <i class="fas fa-power-off"></i>
+                                Règle active
+                            </label>
+                            <small class="form-text text-muted">
+                                Les règles inactives ne sont pas utilisées pour la détection
+                            </small>
+                        </div>
+
+                        <!-- Boutons d'action -->
+                        <div class="form-group text-center mt-4">
+                            <button type="submit" class="btn btn-save text-white">
+                                <i class="fas fa-save"></i>
+                                Enregistrer les modifications
+                            </button>
+                            <a href="{% url 'ml:rule_detail' rule.id %}" class="btn btn-outline-secondary ml-2">
+                                <i class="fas fa-times"></i>
+                                Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonne latérale -->
+        <div class="col-lg-4">
+            <!-- Aide et exemples -->
+            <div class="pattern-help">
+                <h6><i class="fas fa-lightbulb"></i> Aide sur les motifs</h6>
+                
+                <div class="mb-3">
+                    <strong>Motif textuel:</strong>
+                    <code>Article L.*</code>
+                    <p><small>Recherche simple avec caractères génériques</small></p>
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Expression régulière:</strong>
+                    <code>Article\s+L\.\d+-\d+</code>
+                    <p><small>Utilise la syntaxe regex complète</small></p>
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Mots-clés:</strong>
+                    <code>décret, arrêté, circulaire</code>
+                    <p><small>Liste séparée par des virgules</small></p>
+                </div>
+            </div>
+
+            <!-- Section de test -->
+            <div class="preview-section">
+                <h6><i class="fas fa-flask"></i> Test en temps réel</h6>
+                <div class="form-group">
+                    <textarea class="form-control" id="liveTestText" rows="3" 
+                              placeholder="Entrez du texte pour tester..."></textarea>
+                </div>
+                <button type="button" class="btn btn-info btn-sm" id="liveTestBtn">
+                    <i class="fas fa-play"></i> Tester
+                </button>
+                <div id="liveTestResult" class="mt-2"></div>
+            </div>
+
+            <!-- Historique des modifications -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-history"></i>
+                        Informations
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row small">
+                        <dt class="col-sm-6">Créée par:</dt>
+                        <dd class="col-sm-6">{{ rule.created_by.username }}</dd>
+                        
+                        <dt class="col-sm-6">Créée le:</dt>
+                        <dd class="col-sm-6">{{ rule.created_at|date:"d/m/Y H:i" }}</dd>
+                        
+                        <dt class="col-sm-6">Modifiée le:</dt>
+                        <dd class="col-sm-6">{{ rule.updated_at|date:"d/m/Y H:i" }}</dd>
+                        
+                        <dt class="col-sm-6">ID:</dt>
+                        <dd class="col-sm-6">{{ rule.id }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Mise à jour dynamique de la valeur de confiance
+document.getElementById('confidence_score').addEventListener('input', function() {
+    document.getElementById('confidenceValue').textContent = this.value;
+});
+
+// Description dynamique du type de règle
+function updateRuleTypeDescription() {
+    const ruleType = document.getElementById('rule_type').value;
+    const descDiv = document.getElementById('ruleTypeDescription');
+    
+    const descriptions = {
+        'pattern': 'Recherche de motifs textuels simples avec support de caractères génériques (*)',
+        'regex': 'Utilise les expressions régulières pour des recherches complexes et précises',
+        'keyword': 'Recherche de mots-clés spécifiques dans le texte (séparés par des virgules)'
+    };
+    
+    descDiv.textContent = descriptions[ruleType] || '';
+}
+
+document.getElementById('rule_type').addEventListener('change', updateRuleTypeDescription);
+
+// Test en temps réel
+document.getElementById('liveTestBtn').addEventListener('click', function() {
+    const pattern = document.getElementById('pattern').value;
+    const ruleType = document.getElementById('rule_type').value;
+    const testText = document.getElementById('liveTestText').value;
+    const resultDiv = document.getElementById('liveTestResult');
+    
+    if (!pattern || !testText) {
+        resultDiv.innerHTML = '<div class="alert alert-warning alert-sm">Veuillez remplir le motif et le texte de test.</div>';
+        return;
+    }
+    
+    resultDiv.innerHTML = '<small><i class="fas fa-spinner fa-spin"></i> Test en cours...</small>';
+    
+    fetch('{% url "ml:api_test_rule" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            pattern: pattern,
+            rule_type: ruleType,
+            test_text: testText
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.matches && data.matches.length > 0) {
+            resultDiv.innerHTML = '<div class="alert alert-success alert-sm"><i class="fas fa-check"></i> ' + data.match_count + ' correspondance(s) trouvée(s)</div>';
+        } else {
+            resultDiv.innerHTML = '<div class="alert alert-info alert-sm"><i class="fas fa-info"></i> Aucune correspondance</div>';
+        }
+    })
+    .catch(error => {
+        resultDiv.innerHTML = '<div class="alert alert-danger alert-sm"><i class="fas fa-times"></i> Erreur de test</div>';
+    });
+});
+
+// Validation du formulaire
+document.getElementById('editRuleForm').addEventListener('submit', function(e) {
+    const name = document.getElementById('name').value.trim();
+    const pattern = document.getElementById('pattern').value.trim();
+    
+    if (!name || !pattern) {
+        e.preventDefault();
+        alert('Veuillez remplir tous les champs obligatoires.');
+        return;
+    }
+    
+    if (!confirm('Êtes-vous sûr de vouloir modifier cette règle ?')) {
+        e.preventDefault();
+    }
+});
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    updateRuleTypeDescription();
+});
+</script>
+{% endblock %}

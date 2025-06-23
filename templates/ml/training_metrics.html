@@ -1,0 +1,290 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Métriques d'entraînement - {{ training.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        border-left: 4px solid #007bff;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+    .metric-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .entity-metric-row {
+        transition: all 0.3s ease;
+    }
+    .entity-metric-row:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .progress-custom {
+        height: 8px;
+        border-radius: 4px;
+    }
+    .chart-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">Métriques d'entraînement</h1>
+            <p class="text-muted mb-0">{{ training.name }}</p>
+        </div>
+        <div>
+            <a href="{% url 'ml:training_detail' training.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour aux détails
+            </a>
+            <a href="{% url 'ml:export_model' training.modelversion_set.first.id %}" class="btn btn-primary">
+                <i class="fas fa-download"></i> Exporter le modèle
+            </a>
+        </div>
+    </div>
+
+    <!-- Métriques générales -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div class="card-body text-center">
+                    <div class="metric-value">{{ training.accuracy_score|floatformat:3 }}</div>
+                    <div class="metric-label">Précision globale</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div class="card-body text-center">
+                    <div class="metric-value">{{ training.precision_score|floatformat:3 }}</div>
+                    <div class="metric-label">Précision</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div class="card-body text-center">
+                    <div class="metric-value">{{ training.recall_score|floatformat:3 }}</div>
+                    <div class="metric-label">Rappel</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div class="card-body text-center">
+                    <div class="metric-value">{{ training.f1_score|floatformat:3 }}</div>
+                    <div class="metric-label">Score F1</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métriques par entité -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar text-primary"></i>
+                        Métriques par type d'entité
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if entity_metrics %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Type d'entité</th>
+                                        <th>Précision</th>
+                                        <th>Rappel</th>
+                                        <th>Score F1</th>
+                                        <th>Support</th>
+                                        <th>Progression</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entity_type, metrics in entity_metrics.items %}
+                                    <tr class="entity-metric-row">
+                                        <td>
+                                            <strong>{{ entity_type }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-{% if metrics.precision >= 0.8 %}success{% elif metrics.precision >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ metrics.precision|floatformat:3 }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-{% if metrics.recall >= 0.8 %}success{% elif metrics.recall >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ metrics.recall|floatformat:3 }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-{% if metrics.f1_score >= 0.8 %}success{% elif metrics.f1_score >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ metrics.f1_score|floatformat:3 }}
+                                            </span>
+                                        </td>
+                                        <td>{{ metrics.support }}</td>
+                                        <td>
+                                            <div class="progress progress-custom">
+                                                <div class="progress-bar" 
+                                                     style="width: {{ metrics.f1_score|floatformat:0 }}%"
+                                                     role="progressbar"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Aucune métrique détaillée disponible pour cet entraînement.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graphiques additionnels -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h6>Distribution des performances par entité</h6>
+                <canvas id="entityPerformanceChart" height="200"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h6>Matrice de confusion simulée</h6>
+                <canvas id="confusionMatrixChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations sur l'entraînement -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Détails de l'entraînement</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Algorithme:</dt>
+                                <dd class="col-sm-8">{{ training.model_parameters.algorithm|default:"N/A" }}</dd>
+                                
+                                <dt class="col-sm-4">Époques:</dt>
+                                <dd class="col-sm-8">{{ training.model_parameters.epochs|default:"N/A" }}</dd>
+                                
+                                <dt class="col-sm-4">Taille batch:</dt>
+                                <dd class="col-sm-8">{{ training.model_parameters.batch_size|default:"N/A" }}</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Taux d'apprentissage:</dt>
+                                <dd class="col-sm-8">{{ training.model_parameters.learning_rate|default:"N/A" }}</dd>
+                                
+                                <dt class="col-sm-4">Division validation:</dt>
+                                <dd class="col-sm-8">{{ training.validation_split|floatformat:1 }}%</dd>
+                                
+                                <dt class="col-sm-4">Arrêt précoce:</dt>
+                                <dd class="col-sm-8">
+                                    {% if training.model_parameters.early_stopping %}
+                                        <span class="badge badge-success">Activé</span>
+                                    {% else %}
+                                        <span class="badge badge-secondary">Désactivé</span>
+                                    {% endif %}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Graphique des performances par entité
+const entityCtx = document.getElementById('entityPerformanceChart').getContext('2d');
+new Chart(entityCtx, {
+    type: 'radar',
+    data: {
+        labels: [{% for entity_type in entity_metrics.keys %}'{{ entity_type }}'{% if not forloop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'Précision',
+            data: [{% for metrics in entity_metrics.values %}{{ metrics.precision }}{% if not forloop.last %},{% endif %}{% endfor %}],
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        }, {
+            label: 'Rappel',
+            data: [{% for metrics in entity_metrics.values %}{{ metrics.recall }}{% if not forloop.last %},{% endif %}{% endfor %}],
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            r: {
+                beginAtZero: true,
+                max: 1
+            }
+        }
+    }
+});
+
+// Simulation d'une matrice de confusion
+const confusionCtx = document.getElementById('confusionMatrixChart').getContext('2d');
+new Chart(confusionCtx, {
+    type: 'bar',
+    data: {
+        labels: ['Vrais Positifs', 'Faux Positifs', 'Vrais Négatifs', 'Faux Négatifs'],
+        datasets: [{
+            label: 'Valeurs',
+            data: [85, 12, 78, 15],
+            backgroundColor: [
+                'rgba(75, 192, 192, 0.8)',
+                'rgba(255, 206, 86, 0.8)',
+                'rgba(153, 102, 255, 0.8)',
+                'rgba(255, 99, 132, 0.8)'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
